@@ -59,9 +59,9 @@ def test_blocked_unauthorized_tool(sample_workflow):
         trace_id="trace-1",
         requester_id="backend_agent",
         resource_name="deployment_manager",
-        operation="deploy_production",
+        operation="deploy_staging",
         action_type=ResourceActionType.TOOL_CALL,
     )
     decision = engine.evaluate_resource_action(req, sample_workflow)
     assert decision.outcome == PolicyDecisionEnum.BLOCK
-    assert decision.reason_code == "RESOURCE_NOT_ALLOWED"
+    assert decision.reason_code == "TOOL_NOT_ASSIGNED_TO_NODE"

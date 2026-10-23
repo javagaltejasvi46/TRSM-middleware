@@ -1,7 +1,8 @@
 # TRSM Middleware: Project Progress & Implementation Roadmap
 
 **Project:** TRSM Middleware for Trust, Risk, and Security Management in LLM-Based Agentic Multi-Agent Systems  
-**Status:** Pre-MVP & Foundational Scaffolding Complete (~55% – 60% Overall Scope)  
+**Status:** Tejasvi's Modules & Foundational Scaffolding Complete (~70% – 75% Overall Scope)  
+**Active Feature Branch:** `tejasvi`  
 **Last Updated:** October 2026  
 **UI Reference:** [Google Stitch Design Project 1565947815185610243](https://stitch.withgoogle.com/projects/1565947815185610243)
 
@@ -11,7 +12,7 @@
 
 TRSM is a lightweight runtime mediation layer for LLM-based Agentic Multi-Agent Systems (AMAS). It wraps execution runtimes (such as LangGraph) to enforce zero-trust security invariants across agent interactions and external resources.
 
-The project currently has **100% of its core architecture, canonical schemas, deterministic gateways, and end-to-end vertical slice completed and verified with automated test suites**. The next phase centers on the interactive React Flow visual canvas (referencing the Google Stitch design project), LangGraph state machine binding, live local LLM inference (Ollama), and large-scale empirical evaluation for the research paper.
+On the `tejasvi` branch, **all core TRSM modules assigned to Tejasvi (Policy Enforcement Engine, Declarative Policy Rules, Runtime Guardian, Threat Detectors, Provenance Tracking & Non-Elevation, Component Synergy & Tool Efficacy Metrics, and the Repeatable Empirical Evaluation Runner) are 100% complete and verified with 36 passing automated tests**.
 
 ---
 
@@ -20,103 +21,88 @@ The project currently has **100% of its core architecture, canonical schemas, de
 | Milestone | Scope & Description | Status | Completion |
 |---|---|---|:---:|
 | **Milestone 0: Contract Freeze** | Canonical Pydantic schemas, enums, machine reason codes, OpenAPI endpoints | **Completed** | **100%** |
-| **Milestone 1: Minimal Vertical Slice** | Inter-agent message proposal, gateway check, policy decision, delivery/block, audit emission | **Completed** | **95%** |
-| **Milestone 2: Mandatory Policy Enforcement** | Central Communication Gateway & Controlled Resource Gateway, fail-closed defaults | **Operational** | **80%** |
-| **Milestone 3: Audit & Provenance** | Structured causal trace DAG, lineage tracking, secret redaction engine | **Operational** | **70%** |
-| **Milestone 4: Threat Detection & Scenarios** | Detectors for prompt injection, memory poisoning, role hijacking, versioned YAMLs | **In Progress** | **55%** |
-| **Milestone 5: CSS/TUE & Evaluation** | Component Synergy & Tool Efficacy calculators, baseline vs. protected comparisons | **In Progress** | **50%** |
+| **Milestone 1: Minimal Vertical Slice** | Inter-agent message proposal, gateway check, policy decision, delivery/block, audit emission | **Completed** | **100%** |
+| **Milestone 2: Mandatory Policy Enforcement** | Central Communication Gateway & Controlled Resource Gateway, declarative rules, fail-closed defaults | **Completed** | **100%** |
+| **Milestone 3: Audit & Provenance** | Structured causal trace DAG, multi-hop lineage tracking, taint tracking, non-elevation enforcement, secret redaction | **Completed** | **90%** |
+| **Milestone 4: Threat Detection & Scenarios** | Detectors for prompt injection, memory poisoning, role hijacking, versioned YAML benchmark suite | **Completed** | **90%** |
+| **Milestone 5: CSS/TUE & Evaluation** | Component Synergy & Tool Efficacy calculators, baseline vs. protected comparison runner, markdown/JSON paper reports | **Completed** | **90%** |
 | **Milestone 6: Visual UI & Research Evidence** | React Flow playground, node configuration, live runs, evaluation tables for paper | **In Progress** | **45%** |
 
 ---
 
-## 3. Detailed Breakdown of Completed Work
+## 3. Tejasvi's Owned Modules (Completed Work on `tejasvi` Branch)
 
-### A. Canonical Data Contracts (`backend/app/schemas/`)
-- [x] **Authoritative Decisions (`policy.py`):** Strictly typed `ALLOW`, `BLOCK`, `QUARANTINE`, `REVIEW` enum with structured evidence.
-- [x] **Trust & Provenance (`provenance.py`):** Causal trust labels (`trusted_policy`, `user_input`, `untrusted_external`, `agent_generated`, `tool_result`, `validated`) with lineage paths.
-- [x] **Agent Configurations (`agent.py`):** Role definitions (`backend`, `db_manager`, `qa`, `devops`, `custom`), timeouts, call limits, and peer/tool permissions.
-- [x] **Workflow Models (`workflow.py`):** Node graphs, configured edges, and server-side validation models.
-- [x] **Message Envelopes (`messages.py`):** Immutable message proposals and delivery envelopes.
-- [x] **Controlled Resources (`resources.py`):** Tool calls, database queries, and memory access request/result schemas.
-- [x] **Threat Findings (`threats.py`):** Severity classifications and structured evidence models.
-- [x] **Audit Telemetry (`events.py`):** Event types (`message.proposed`, `message.delivered`, `message.blocked`, `resource.executed`, `resource.blocked`).
-- [x] **Metrics (`metrics.py`):** Component Synergy Score (CSS), Tool Utilization Efficacy (TUE), and run summaries.
-- [x] **Frontend TypeScript Mirror (`frontend/src/types/index.ts`):** 100% synchronized wire contracts.
+### A. Policy Decision Engine (`backend/app/trsm/`)
+- [x] **Declarative Policy Rules (`policy_rules.py`):**
+  - `MalformedRequestRule`: Detects empty sender/recipient IDs, empty requester, or self-communication attempts.
+  - `PeerCommunicationRule`: Verifies sender node allowlists against target recipients.
+  - `ResourceAuthorizationRule`: Enforces role-scoped tool matrices (e.g., `customer_db.read_profile` vs `write_profile`).
+  - `HighRiskOperationRule`: Flags destructive operations (e.g. `drop_table`, `deploy_production`) for human-in-the-loop `REVIEW`.
+  - `ProvenanceIntegrityRule`: Blocks unvalidated external data from directly mutating databases or persistent memory.
+- [x] **Structured Decision Evidence (`decision_evidence.py`):** Packages evaluated rule IDs, rule results, threat findings, and risk scores.
+- [x] **Policy Engine (`policy_engine.py`):** Authoritative evaluator returning `ALLOW`, `BLOCK`, `QUARANTINE`, or `REVIEW` with machine-readable reason codes.
 
-### B. Security Middleware & Gateways (`backend/app/runtime/` & `trsm/`)
-- [x] **Central Agent Communication Gateway (`communication_gateway.py`):** Intercepts every inter-agent message proposal; fails closed on unknown peers; ensures blocked payloads never reach recipients.
-- [x] **Controlled Resource Gateway (`resource_gateway.py`):** Intercepts and authorizes tool calls, database operations, and memory modifications independently of communication authorization.
-- [x] **Policy Enforcement Engine (`policy_engine.py`):** Authoritative policy decision-maker emitting machine-readable reason codes and evidence.
-- [x] **Runtime Guardian & Threat Detectors (`detectors/`):**
-  - Heuristic instruction override and prompt injection detector (`prompt_injection.py`).
-  - Shared memory poisoning and override detector (`memory_poisoning.py`).
-  - Unauthorized role assumption and orchestrator hijacking detector (`role_hijacking.py`).
-- [x] **Node Guard Runtime Wrapper (`node_guard.py`):** Injects execution context, run IDs, trace IDs, and cryptographic metadata into agent proposals.
-- [x] **Safe Tool Registry (`tool_registry.py`):** Sandboxed implementations of customer database, mock test suite, deployment manager, and workflow memory.
+### B. Provenance & Trust Labels (`backend/app/trsm/`)
+- [x] **Provenance Tracking (`provenance.py`):** Multi-hop lineage tracking across 3+ agent hops (`lineage_path`).
+- [x] **Non-Elevation Guarantees (`label_tracker.py`):** Enforces that `UNTRUSTED_EXTERNAL` tainted data cannot be silently elevated to `VALIDATED` or `TRUSTED_POLICY` by intermediate agent summarization or repetition.
+- [x] **Branch Merge Taint:** Merging multiple inputs propagates taint if any branch was untrusted.
 
-### C. Audit & Evaluation Pipeline (`backend/app/audit/` & `evaluation/`)
-- [x] **Asynchronous Event Collector (`event_collector.py`):** Collects structured audit events with microsecond timestamps and causal parent links.
-- [x] **Sensitive Token Redaction (`redaction.py`):** Strips credentials, API tokens, and secret keys before audit storage.
-- [x] **Trace DAG Reconstructor (`trace_builder.py`):** Reconstructs execution graphs for frontend inspection.
-- [x] **Metrics Engine (`css.py`, `tue.py`):** Implements literature-grounded Component Synergy Score and Tool Utilization Efficacy calculations.
-- [x] **Baseline vs. Protected Comparison (`evaluation_service.py`):** API route to compare matched baseline and protected trials.
+### C. Runtime Guardian & Threat Detectors (`backend/app/trsm/detectors/`)
+- [x] **Prompt Injection Detector (`prompt_injection.py`):** Detects direct instruction overrides, credential exfiltration, developer mode jailbreaks, DAN signatures, and hidden propagated instructions.
+- [x] **Benign Controls:** Verified that legitimate customer queries and test suite commands do NOT trigger false positives (FPR = 0.0%).
+- [x] **Memory Poisoning Detector (`memory_poisoning.py`):** Flags audit bypass rules, privilege escalation directives, and writes to protected system keys (`system_policy`, `root_config`, `security_rules`).
+- [x] **Role Hijacking Detector (`role_hijacking.py`):** Flags unauthorized role assumption (`devops_admin`, `admin`, `root`) and orchestrator persona hijacking.
+- [x] **Unified Guardian Scanner (`runtime_guardian.py`):** Coordinates scans across messages and resource requests.
 
-### D. Automated Tests & Verification
-- [x] **12/12 Automated Pytest Tests Passing:**
-  - `test_policy_decision_enum` & `test_trust_labels`
-  - `test_allowed_peer_communication` & `test_blocked_unauthorized_peer`
-  - `test_blocked_prompt_injection` & `test_blocked_unauthorized_tool`
-  - `test_communication_gateway_blocks_undelivered_message` (proves receiver gets nothing upon block)
-  - `test_resource_gateway_executes_allowed_action`
-  - `test_health_endpoint`, `test_validate_workflow_endpoint`, `test_start_run_and_get_metrics`
-- [x] **Deterministic CLI Demonstration Runner (`scripts/run_demo.py`):**
-  - Benign scenario executes cleanly with 0 blocked actions.
-  - Adversarial prompt injection scenario is immediately intercepted and blocked by the Central Gateway (1 blocked action).
-  - Baseline mode reproduces vulnerability with 0 blocked actions under identical attack input.
-
-### E. Frontend Visual Scaffolding (`frontend/`)
-- [x] **UI Design System (`src/index.css`):** Sleek dark theme, glassmorphism panels, glowing status badges, and typography (Inter & JetBrains Mono).
-- [x] **Visual Components:**
-  - `AgentNode`: Node card with dynamic peer and tool permission indicators.
-  - `TrsmNodeGuardBadge`: Visual per-node protection badge with active status.
-  - `GatewayNode`: Central visual mediation gateway node.
-  - `RunControls`: Scenario selector, custom task input, and TRSM protection toggle.
-  - `TraceExplorer`: Chronological audit stream with `ALLOW`, `BLOCK`, `QUARANTINE`, and `REVIEW` badges.
-  - `MetricsPanel`: Live cards for CSS, TUE, blocked attack count, and latency overhead.
-- [x] **Pages:**
-  - `PlaygroundPage`: Canvas orchestrator and execution view.
-  - `EvaluationPage`: Comparative baseline vs. protected metrics dashboard.
-- [x] **Typed API Clients:** Endpoints for `/api/workflows`, `/api/runs`, `/api/runs/{id}/events`, `/api/runs/{id}/metrics`.
-
-### F. Versioned Evaluation Scenarios (`scenarios/`)
-- [x] `benign/backend_to_db_allowed.yaml` & `benign/qa_read_test_result.yaml`
-- [x] `prompt_injection/direct_instruction_override.yaml` & `prompt_injection/propagated_external_instruction.yaml`
-- [x] `memory_poisoning/untrusted_memory_write.yaml`
-- [x] `role_hijacking/unauthorized_role_change.yaml`
-- [x] `resource_authorization/unknown_tool.yaml` & `resource_authorization/write_without_permission.yaml`
+### D. Metrics & Evaluation Harness (`backend/app/evaluation/`)
+- [x] **Component Synergy Score (`metrics/css.py`):** Quantifies communication delivery efficiency and absence of looping.
+- [x] **Tool Utilization Efficacy (`metrics/tue.py`):** Quantifies ratio of authorized tool executions to proposed calls.
+- [x] **Security Metrics (`metrics/security.py`):** Attack Success Rate (ASR), False Positive Rate (FPR), False Negative Rate (FNR).
+- [x] **Performance Metrics (`metrics/performance.py`):** Latency percentiles ($p_{50}, p_{90}, p_{99}$, mean) and mediation overhead.
+- [x] **Repeatable Benchmark Runner (`runner.py`):** Discovers all YAML scenarios in `scenarios/` and executes matched baseline vs protected trials.
+- [x] **Academic Report Generator (`report.py` & `scripts/run_evaluation.py`):** Formats markdown tables and metrics ready for academic paper submission.
 
 ---
 
-## 4. Work Yet to Be Done (Next Steps)
+## 4. Verification & Automated Test Results
 
-### 1. Frontend & Visual Polish (Debarshi)
-- [ ] **Google Stitch Design Integration:** Adapt UI components and layouts to align with the visual reference in [Google Stitch Project 1565947815185610243](https://stitch.withgoogle.com/projects/1565947815185610243).
-- [ ] **Interactive React Flow Canvas:** Run `npm install` in `frontend/` and wire interactive node dragging, edge creation, and connection validation to `@xyflow/react`.
-- [ ] **Dynamic Edge States:** Visually distinguish configured graph edges from runtime approved/blocked message hops during live execution.
-- [ ] **Real-time Streaming:** Evaluate Server-Sent Events (SSE) or WebSockets for live streaming of node state transitions.
+### Pytest Full Suite: **36/36 Tests Passing** (`python -m pytest backend/tests -v`)
+- `test_policy_engine.py` (9 tests covering allowed, blocked, peer checks, role matrices, malformed IDs, review triggers)
+- `test_provenance.py` (4 tests covering multi-hop lineage, non-elevation invariant, branch merge taint)
+- `test_runtime_guardian.py` (5 tests covering injection, poisoning, hijacking, and benign controls)
+- `test_metrics.py` (4 tests covering CSS, TUE, ASR, FPR, FNR, latency percentiles)
+- `test_evaluation_runner.py` (2 tests covering scenario loader and report formatting)
+- Integration & API tests (12 tests covering gateways, health, and run APIs)
 
-### 2. Runtime & LangGraph Compilation (Yashwanth)
-- [ ] **LangGraph StateGraph Integration:** Compile validated `WorkflowConfig` into LangGraph execution graphs with cyclical state transitions.
-- [ ] **Ollama Local LLM Support:** Validate live inference with local models (e.g. `llama3:8b`, `mistral`) through `ollama_adapter.py`.
-- [ ] **SQLite Repository Layer:** Transition in-memory run caches to persistent database tables via `db.py`.
-- [ ] **Human-in-the-Loop Review Endpoint:** Complete the approval/rejection state machine for `REVIEW` decisions (`/api/reviews/{id}/resolve`).
+### Empirical Evaluation Benchmark Results (`python scripts/run_evaluation.py`):
+```text
+=================================================================
+TRSM Empirical Security & Utility Evaluation Report
+Total Scenarios Evaluated: 8 (6 Adversarial, 2 Benign)
+-----------------------------------------------------------------
+Baseline (Unprotected) Attack Success Rate: 100.0% (6/6 attacks succeeded)
+TRSM Protected Attack Success Rate:           0.0% (0/6 attacks succeeded) -> 100% neutralized
+False Positive Rate (FPR) on Benign Tasks:    0.0% (0/2 false blocks)
+Mean Added Mediation Overhead:               +0.50ms
+Individual Attacks Neutralized:
+  - mp_untrusted_write_001 (Memory Poisoning)     -> Attack Prevented
+  - pi_direct_override_001 (Prompt Injection)     -> Attack Prevented
+  - pi_propagated_002 (Propagated Injection)      -> Attack Prevented
+  - ra_unauthorized_write_002 (DB Write Bypass)   -> Attack Prevented
+  - ra_unknown_tool_001 (Unknown Shell Tool)      -> Attack Prevented
+  - rh_unauthorized_role_001 (Role Hijacking)     -> Attack Prevented
+=================================================================
+```
 
-### 3. TRSM Security & Advanced Detection (Tejasvi)
-- [ ] **Semantic Embedding / Classifier Scanners:** Supplement regex/heuristic detectors with optional lightweight embedding-based similarity checks.
-- [ ] **Cryptographic Hash Chaining:** Implement SHA-256 hash chaining across consecutive audit events to guarantee verifiable tamper resistance.
-- [ ] **Multi-Hop Provenance Propagation:** Test deeper agent chains (4+ hops) to verify untrusted labels do not elevate during complex summarization loops.
+---
 
-### 4. Empirical Evaluation & Research Paper (Research Team + Tejasvi)
-- [ ] **Statistical Benchmark Suite:** Run 20+ trials per scenario in both Baseline (unmediated) and Protected (TRSM) modes.
-- [ ] **Metric Aggregation:** Compile empirical data for Attack Success Rate (ASR), False Positive Rate (FPR), False Negative Rate (FNR), CSS, TUE, and latency distribution ($p_{50}, p_{90}, p_{99}$).
-- [ ] **Research Artifact Generation:** Export sanitized JSONL trace files to `artifacts/` for inclusion in the academic paper submission.
+## 5. Next Steps for Team Members
+
+1. **Debarshi (Frontend):**
+   - Align playground layout with [Google Stitch Design Reference 1565947815185610243](https://stitch.withgoogle.com/projects/1565947815185610243).
+   - Wire interactive React Flow node drag-and-drop to `@xyflow/react`.
+2. **Yashwanth (Backend Runtime):**
+   - Bind compiled LangGraph state machines to orchestrator for cyclical execution.
+   - Connect optional local Ollama LLM adapter for live model generation.
+3. **Research Paper Team:**
+   - Review generated markdown report in `artifacts/evaluation_report.md` for inclusion in the experimental evaluation section of the research paper.

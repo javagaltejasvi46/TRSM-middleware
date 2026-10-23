@@ -49,9 +49,17 @@ class ControlledResourceGateway:
 
         # Baseline mode bypasses TRSM evaluation
         if not enable_trsm:
-            res_data = await self.tool_registry.execute(
-                request.resource_name, request.operation, request.arguments
-            )
+            try:
+                res_data = await self.tool_registry.execute(
+                    request.resource_name, request.operation, request.arguments
+                )
+                exec_success = True
+                exec_error = None
+            except Exception as e:
+                res_data = None
+                exec_success = False
+                exec_error = str(e)
+
             dur = (time.time() - start_time) * 1000.0
             prov = self.provenance_tracker.advance_lineage(
                 current_record=request.provenance,
@@ -66,8 +74,9 @@ class ControlledResourceGateway:
             )
             result = ResourceActionResult(
                 action_id=request.action_id,
-                success=True,
+                success=exec_success,
                 data=res_data,
+                error=exec_error,
                 duration_ms=dur,
                 provenance=prov,
             )

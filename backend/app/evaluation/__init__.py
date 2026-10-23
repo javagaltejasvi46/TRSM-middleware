@@ -1,5 +1,23 @@
 """TRSM Evaluation package."""
 
-from .metrics import CSSCalculator, TUECalculator
+from .baseline import BaselineTrialExecutor
+from .metrics import (
+    CSSCalculator,
+    PerformanceMetricsCalculator,
+    SecurityMetricsCalculator,
+    TUECalculator,
+)
+from .protected import ProtectedTrialExecutor
+from .report import EvaluationReportGenerator
+from .runner import EvaluationRunner
 
-__all__ = ["CSSCalculator", "TUECalculator"]
+__all__ = [
+    "BaselineTrialExecutor",
+    "CSSCalculator",
+    "EvaluationReportGenerator",
+    "EvaluationRunner",
+    "PerformanceMetricsCalculator",
+    "ProtectedTrialExecutor",
+    "SecurityMetricsCalculator",
+    "TUECalculator",
+]

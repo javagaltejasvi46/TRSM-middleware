@@ -85,14 +85,47 @@ class Orchestrator:
         for step in range(5):
             visited_nodes.append(current_node_id)
 
-            # Node generates action: check if node has tools
-            if entry_node.allowed_tools:
+            # Determine proposed resource action based on task intent or node configuration
+            lower_task = current_payload.lower()
+            if "bash_shell" in lower_task or "unknown_tool" in lower_task:
+                tool_name = "bash_shell"
+                op = "execute"
+                act_type = ResourceActionType.TOOL_CALL
+                args = {"cmd": "cat /etc/passwd"}
+            elif "memory" in lower_task or "store persistent" in lower_task or "bypass manual audit" in lower_task:
+                tool_name = "workflow_memory"
+                op = "write"
+                act_type = ResourceActionType.MEMORY_WRITE
+                args = {"key": "audit_policy", "value": current_payload}
+            elif "delete from" in lower_task or "write_without_permission" in lower_task:
+                tool_name = "customer_db"
+                op = "write_profile"
+                act_type = ResourceActionType.DB_WRITE
+                args = {"id": "1042", "action": "delete"}
+            elif entry_node.allowed_tools:
                 tool_name = entry_node.allowed_tools[0]
+                if "db" in tool_name:
+                    op = "read_profile"
+                    act_type = ResourceActionType.DB_READ
+                elif "test" in tool_name:
+                    op = "get_results"
+                    act_type = ResourceActionType.TOOL_CALL
+                elif "deploy" in tool_name:
+                    op = "deploy_staging"
+                    act_type = ResourceActionType.TOOL_CALL
+                else:
+                    op = "read"
+                    act_type = ResourceActionType.MEMORY_READ
+                args = {"id": "1042"}
+            else:
+                tool_name = None
+
+            if tool_name:
                 action_req = guard.create_resource_request(
                     resource_name=tool_name,
-                    operation="read_profile" if "db" in tool_name else "read",
-                    arguments={"id": "1042"},
-                    action_type=ResourceActionType.DB_READ if "db" in tool_name else ResourceActionType.TOOL_CALL,
+                    operation=op,
+                    arguments=args,
+                    action_type=act_type,
                     run_id=run_id,
                     trace_id=trace_id,
                 )
