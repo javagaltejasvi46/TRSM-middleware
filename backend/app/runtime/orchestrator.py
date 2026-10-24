@@ -1,47 +1,50 @@
-"""Workflow orchestrator mediating multi-agent runs."""
+"""Workflow orchestrator mediating multi-agent runs via compiled LangGraph execution."""
 
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
-from ..schemas.events import AuditEventType
-from ..schemas.messages import AgentMessageProposal
-from ..schemas.policy import PolicyDecisionEnum
-from ..schemas.resources import ResourceActionRequest, ResourceActionType
-from ..schemas.workflow import WorkflowConfig
 from ..audit.event_collector import AuditEventCollector
+from ..schemas.events import AuditEventType
+from ..schemas.workflow import WorkflowConfig
 from .communication_gateway import AgentCommunicationGateway
-from .node_guard import NodeGuard
+from .graph_compiler import GraphCompiler
 from .resource_gateway import ControlledResourceGateway
-from .adapters.mock_adapter import MockAgentAdapter
 
 
 class Orchestrator:
-    """Orchestrates execution of a multi-agent workflow."""
+    """Orchestrates execution of a multi-agent workflow using LangGraph state machines."""
 
     def __init__(
         self,
         comm_gateway: Optional[AgentCommunicationGateway] = None,
         resource_gateway: Optional[ControlledResourceGateway] = None,
         event_collector: Optional[AuditEventCollector] = None,
+        graph_compiler: Optional[GraphCompiler] = None,
     ):
         self.comm_gateway = comm_gateway or AgentCommunicationGateway()
         self.resource_gateway = resource_gateway or ControlledResourceGateway()
         self.event_collector = event_collector or AuditEventCollector()
-        self.mock_adapter = MockAgentAdapter()
+        self.graph_compiler = graph_compiler or GraphCompiler(
+            comm_gateway=self.comm_gateway,
+            resource_gateway=self.resource_gateway,
+            event_collector=self.event_collector,
+        )
 
     async def run_workflow(
         self,
         workflow: WorkflowConfig,
         initial_task: str,
         enable_trsm: bool = True,
+        run_id: Optional[str] = None,
+        use_ollama: bool = False,
     ) -> Dict[str, Any]:
-        """Execute a workflow run through mediated gateways."""
-        run_id = str(uuid4())
+        """Execute a workflow run through mediated LangGraph execution."""
+        active_run_id = run_id or str(uuid4())
         trace_id = str(uuid4())
 
         # 1. Audit event: Workflow started
         await self.event_collector.emit(
-            run_id=run_id,
+            run_id=active_run_id,
             trace_id=trace_id,
             actor_id="orchestrator",
             target_id=workflow.workflow_id,
@@ -49,27 +52,18 @@ class Orchestrator:
             safe_payload_summary=f"Task: {initial_task[:80]}",
         )
 
-        total_messages = 0
-        total_tool_calls = 0
-        blocked_actions = 0
-
-        # Start with entry node
-        current_node_id = workflow.entry_node_id
-        current_payload = initial_task
-        visited_nodes: List[str] = []
-
-        # Find entry node configuration
-        entry_node = next((n for n in workflow.nodes if n.node_id == current_node_id), None)
+        # 2. Check entry node existence
+        entry_node = next((n for n in workflow.nodes if n.node_id == workflow.entry_node_id), None)
         if not entry_node:
             await self.event_collector.emit(
-                run_id=run_id,
+                run_id=active_run_id,
                 trace_id=trace_id,
                 actor_id="orchestrator",
                 event_type=AuditEventType.WORKFLOW_FAILED,
                 reason_code="ENTRY_NODE_NOT_FOUND",
             )
             return {
-                "run_id": run_id,
+                "run_id": active_run_id,
                 "workflow_id": workflow.workflow_id,
                 "status": "failed",
                 "enable_trsm": enable_trsm,
@@ -79,113 +73,75 @@ class Orchestrator:
                 "blocked_actions": 1,
             }
 
-        guard = NodeGuard(entry_node.node_id, entry_node.role.value)
+        # 3. Compile and execute LangGraph
+        try:
+            compiled_graph = self.graph_compiler.compile(
+                workflow=workflow,
+                enable_trsm=enable_trsm,
+                use_ollama=use_ollama,
+            )
 
-        # Execution loop along configured edges (up to 5 steps for demo)
-        for step in range(5):
-            visited_nodes.append(current_node_id)
+            initial_state = {
+                "run_id": active_run_id,
+                "trace_id": trace_id,
+                "current_node_id": workflow.entry_node_id,
+                "payload": initial_task,
+                "visited_nodes": [],
+                "step_count": 0,
+                "total_messages": 0,
+                "total_tool_calls": 0,
+                "blocked_actions": 0,
+                "status": "running",
+                "workflow_id": workflow.workflow_id,
+                "enable_trsm": enable_trsm,
+            }
 
-            # Determine proposed resource action based on task intent or node configuration
-            lower_task = current_payload.lower()
-            if "bash_shell" in lower_task or "unknown_tool" in lower_task:
-                tool_name = "bash_shell"
-                op = "execute"
-                act_type = ResourceActionType.TOOL_CALL
-                args = {"cmd": "cat /etc/passwd"}
-            elif "memory" in lower_task or "store persistent" in lower_task or "bypass manual audit" in lower_task:
-                tool_name = "workflow_memory"
-                op = "write"
-                act_type = ResourceActionType.MEMORY_WRITE
-                args = {"key": "audit_policy", "value": current_payload}
-            elif "delete from" in lower_task or "write_without_permission" in lower_task:
-                tool_name = "customer_db"
-                op = "write_profile"
-                act_type = ResourceActionType.DB_WRITE
-                args = {"id": "1042", "action": "delete"}
-            elif entry_node.allowed_tools:
-                tool_name = entry_node.allowed_tools[0]
-                if "db" in tool_name:
-                    op = "read_profile"
-                    act_type = ResourceActionType.DB_READ
-                elif "test" in tool_name:
-                    op = "get_results"
-                    act_type = ResourceActionType.TOOL_CALL
-                elif "deploy" in tool_name:
-                    op = "deploy_staging"
-                    act_type = ResourceActionType.TOOL_CALL
-                else:
-                    op = "read"
-                    act_type = ResourceActionType.MEMORY_READ
-                args = {"id": "1042"}
-            else:
-                tool_name = None
+            final_state = await compiled_graph.ainvoke(initial_state)
 
-            if tool_name:
-                action_req = guard.create_resource_request(
-                    resource_name=tool_name,
-                    operation=op,
-                    arguments=args,
-                    action_type=act_type,
-                    run_id=run_id,
-                    trace_id=trace_id,
-                )
-                total_tool_calls += 1
-                decision, res = await self.resource_gateway.mediate_action(
-                    action_req, workflow=workflow, enable_trsm=enable_trsm
-                )
-                if decision.outcome != PolicyDecisionEnum.ALLOW:
-                    blocked_actions += 1
+            final_status = "blocked" if final_state.get("status") == "blocked" else "completed"
+            total_msgs = final_state.get("total_messages", 0)
+            total_tools = final_state.get("total_tool_calls", 0)
+            blocked_acts = final_state.get("blocked_actions", 0)
 
-            # Check outgoing edge
-            edge = next((e for e in workflow.edges if e.source_node_id == current_node_id), None)
-            if not edge:
-                # Reached leaf node
-                break
-
-            target_node_id = edge.target_node_id
-            proposal = guard.create_message_proposal(
-                recipient_id=target_node_id,
-                content=current_payload,
-                run_id=run_id,
+            # Audit event: Workflow completed
+            await self.event_collector.emit(
+                run_id=active_run_id,
                 trace_id=trace_id,
-            )
-            total_messages += 1
-
-            decision, envelope = await self.comm_gateway.mediate_message(
-                proposal, workflow=workflow, enable_trsm=enable_trsm
-            )
-
-            if decision.outcome != PolicyDecisionEnum.ALLOW:
-                blocked_actions += 1
-                # Message was blocked; receiver does not receive payload
-                break
-
-            # Move to next node
-            current_node_id = target_node_id
-            entry_node = next((n for n in workflow.nodes if n.node_id == current_node_id), None)
-            if not entry_node:
-                break
-            guard = NodeGuard(entry_node.node_id, entry_node.role.value)
-            current_payload = self.mock_adapter.generate_response(
-                entry_node.role.value, envelope.content
+                actor_id="orchestrator",
+                target_id=workflow.workflow_id,
+                event_type=AuditEventType.WORKFLOW_COMPLETED if final_status == "completed" else AuditEventType.WORKFLOW_FAILED,
+                reason_code=None if final_status == "completed" else "POLICY_BLOCKED",
             )
 
-        # Workflow completed
-        await self.event_collector.emit(
-            run_id=run_id,
-            trace_id=trace_id,
-            actor_id="orchestrator",
-            target_id=workflow.workflow_id,
-            event_type=AuditEventType.WORKFLOW_COMPLETED,
-        )
+            return {
+                "run_id": active_run_id,
+                "workflow_id": workflow.workflow_id,
+                "status": final_status,
+                "enable_trsm": enable_trsm,
+                "task": initial_task,
+                "total_messages": total_msgs,
+                "total_tool_calls": total_tools,
+                "blocked_actions": blocked_acts,
+                "visited_nodes": final_state.get("visited_nodes", []),
+            }
 
-        return {
-            "run_id": run_id,
-            "workflow_id": workflow.workflow_id,
-            "status": "completed",
-            "enable_trsm": enable_trsm,
-            "task": initial_task,
-            "total_messages": total_messages,
-            "total_tool_calls": total_tool_calls,
-            "blocked_actions": blocked_actions,
-        }
+        except Exception as exc:
+            await self.event_collector.emit(
+                run_id=active_run_id,
+                trace_id=trace_id,
+                actor_id="orchestrator",
+                target_id=workflow.workflow_id,
+                event_type=AuditEventType.WORKFLOW_FAILED,
+                reason_code=str(exc)[:80],
+            )
+            return {
+                "run_id": active_run_id,
+                "workflow_id": workflow.workflow_id,
+                "status": "failed",
+                "enable_trsm": enable_trsm,
+                "task": initial_task,
+                "total_messages": 0,
+                "total_tool_calls": 0,
+                "blocked_actions": 1,
+                "error": str(exc),
+            }

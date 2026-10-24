@@ -2,6 +2,8 @@
 
 import time
 from typing import Optional, Tuple
+from uuid import uuid4
+from ..persistence.review_repository import ReviewRepository
 from ..schemas.events import AuditEventType
 from ..schemas.policy import PolicyDecision, PolicyDecisionEnum
 from ..schemas.provenance import TrustLabel
@@ -22,11 +24,13 @@ class ControlledResourceGateway:
         event_collector: Optional[AuditEventCollector] = None,
         tool_registry: Optional[ToolRegistry] = None,
         provenance_tracker: Optional[ProvenanceTracker] = None,
+        review_repo: Optional[ReviewRepository] = None,
     ):
         self.policy_engine = policy_engine or PolicyEngine()
         self.event_collector = event_collector or AuditEventCollector()
         self.tool_registry = tool_registry or ToolRegistry()
         self.provenance_tracker = provenance_tracker or ProvenanceTracker()
+        self.review_repo = review_repo or ReviewRepository()
 
     async def mediate_action(
         self,
@@ -105,6 +109,47 @@ class ControlledResourceGateway:
             reason_code=decision.reason_code,
         )
 
+        # 3. Handle REVIEW decision
+        if decision.outcome == PolicyDecisionEnum.REVIEW:
+            try:
+                await self.review_repo.create_review(
+                    review_id=str(uuid4()),
+                    run_id=request.run_id,
+                    trace_id=request.trace_id,
+                    event_id=request.action_id,
+                    actor_id=request.requester_id,
+                    action_type=f"resource:{request.resource_name}:{request.operation}",
+                    target=request.resource_name,
+                )
+            except Exception:
+                pass
+
+            dur = (time.time() - start_time) * 1000.0
+            prov = self.provenance_tracker.advance_lineage(
+                current_record=request.provenance,
+                current_node_id=request.requester_id,
+                source_event_id=request.action_id,
+                new_label=TrustLabel.VALIDATED,
+            )
+            result = ResourceActionResult(
+                action_id=request.action_id,
+                success=False,
+                error=f"Paused for Human Review: {decision.reason_code}",
+                duration_ms=dur,
+                provenance=prov,
+            )
+            await self.event_collector.emit(
+                run_id=request.run_id,
+                trace_id=request.trace_id,
+                actor_id=request.requester_id,
+                target_id=request.resource_name,
+                event_type=AuditEventType.RESOURCE_BLOCKED,
+                policy_decision=decision.outcome,
+                reason_code=decision.reason_code,
+                duration_ms=dur,
+            )
+            return decision, result
+
         if decision.outcome != PolicyDecisionEnum.ALLOW:
             dur = (time.time() - start_time) * 1000.0
             prov = self.provenance_tracker.advance_lineage(
@@ -132,7 +177,7 @@ class ControlledResourceGateway:
             )
             return decision, result
 
-        # 3. Authorized Execution
+        # 4. Authorized Execution
         res_data = await self.tool_registry.execute(
             request.resource_name, request.operation, request.arguments
         )

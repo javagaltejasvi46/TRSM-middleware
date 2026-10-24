@@ -1,6 +1,8 @@
 """Central TRSM Agent Communication Gateway."""
 
 from typing import Optional, Tuple
+from uuid import uuid4
+from ..persistence.review_repository import ReviewRepository
 from ..schemas.events import AuditEventType
 from ..schemas.messages import AgentMessageProposal, MessageDeliveryStatus, MessageEnvelope
 from ..schemas.policy import PolicyDecision, PolicyDecisionEnum
@@ -18,10 +20,12 @@ class AgentCommunicationGateway:
         policy_engine: Optional[PolicyEngine] = None,
         event_collector: Optional[AuditEventCollector] = None,
         provenance_tracker: Optional[ProvenanceTracker] = None,
+        review_repo: Optional[ReviewRepository] = None,
     ):
         self.policy_engine = policy_engine or PolicyEngine()
         self.event_collector = event_collector or AuditEventCollector()
         self.provenance_tracker = provenance_tracker or ProvenanceTracker()
+        self.review_repo = review_repo or ReviewRepository()
 
     async def mediate_message(
         self,
@@ -112,6 +116,32 @@ class AgentCommunicationGateway:
                 reason_code=decision.reason_code,
             )
             return decision, envelope
+
+        elif decision.outcome == PolicyDecisionEnum.REVIEW:
+            # Create pending human review record
+            try:
+                await self.review_repo.create_review(
+                    review_id=str(uuid4()),
+                    run_id=proposal.run_id,
+                    trace_id=proposal.trace_id,
+                    event_id=proposal.proposal_id,
+                    actor_id=proposal.sender_id,
+                    action_type="inter_agent_message",
+                    target=proposal.recipient_id,
+                )
+            except Exception:
+                pass
+
+            await self.event_collector.emit(
+                run_id=proposal.run_id,
+                trace_id=proposal.trace_id,
+                actor_id=proposal.sender_id,
+                target_id=proposal.recipient_id,
+                event_type=AuditEventType.MESSAGE_BLOCKED,
+                policy_decision=decision.outcome,
+                reason_code=decision.reason_code,
+            )
+            return decision, None
 
         elif decision.outcome == PolicyDecisionEnum.QUARANTINE:
             await self.event_collector.emit(

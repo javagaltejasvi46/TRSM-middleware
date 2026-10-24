@@ -18,9 +18,15 @@ class TraceService:
         run_id: str,
         event_type: Optional[str] = None,
         actor_id: Optional[str] = None,
+        policy_decision: Optional[str] = None,
     ) -> List[AuditEvent]:
-        return self.collector.get_events_for_run(run_id, event_type, actor_id)
+        return await self.collector.get_events_for_run_async(
+            run_id=run_id,
+            event_type=event_type,
+            actor_id=actor_id,
+            policy_decision=policy_decision,
+        )
 
     async def get_trace_graph(self, run_id: str) -> Dict[str, Any]:
-        events = self.collector.get_events_for_run(run_id)
+        events = await self.collector.get_events_for_run_async(run_id=run_id)
         return self.trace_builder.build_trace_graph(events)

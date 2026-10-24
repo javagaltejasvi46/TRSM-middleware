@@ -1,4 +1,4 @@
-"""Audit events API routes."""
+"""Audit events and trace API routes."""
 
 from typing import List, Optional
 from fastapi import APIRouter, Query
@@ -14,14 +14,20 @@ async def get_run_events(
     run_id: str,
     event_type: Optional[str] = Query(None, description="Filter by event type"),
     actor_id: Optional[str] = Query(None, description="Filter by actor node ID"),
+    policy_decision: Optional[str] = Query(None, description="Filter by policy decision (ALLOW, BLOCK, REVIEW, QUARANTINE)"),
 ):
-    """Retrieve structured audit events for a specific run."""
+    """Retrieve structured audit events for a specific run from SQLite."""
     trace_service = TraceService()
-    return await trace_service.get_events(run_id=run_id, event_type=event_type, actor_id=actor_id)
+    return await trace_service.get_events(
+        run_id=run_id,
+        event_type=event_type,
+        actor_id=actor_id,
+        policy_decision=policy_decision,
+    )
 
 
 @router.get("/trace")
 async def get_run_trace(run_id: str):
-    """Reconstruct causal execution trace graph for frontend explorer."""
+    """Reconstruct causal execution trace graph for frontend trace explorer."""
     trace_service = TraceService()
     return await trace_service.get_trace_graph(run_id=run_id)

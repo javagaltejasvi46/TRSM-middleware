@@ -23,6 +23,7 @@ class TraceBuilder:
             })
             if evt.parent_event_id:
                 links.append({
+                    "id": f"link_{evt.parent_event_id}_{evt.event_id}",
                     "source": evt.parent_event_id,
                     "target": evt.event_id,
                 })
@@ -32,4 +33,5 @@ class TraceBuilder:
             "total_events": len(events),
             "nodes": nodes,
             "links": links,
+            "edges": links,
         }

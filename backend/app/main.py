@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
+from .persistence.db import init_db
 from .api.routes import (
     events_router,
     health_router,
@@ -18,7 +19,8 @@ from .api.routes import (
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan context (initialization & teardown)."""
-    # Startup: Initialize SQLite schemas and connections if necessary
+    # Startup: Initialize SQLite schemas and connections
+    await init_db()
     yield
     # Shutdown: Flush event queues and cleanup connections
 
@@ -58,4 +60,4 @@ app = create_app()
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("app.main:app", host=settings.HOST, port=settings.PORT, reload=True)
+    uvicorn.run("backend.app.main:app", host=settings.HOST, port=settings.PORT, reload=True)
