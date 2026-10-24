@@ -8,11 +8,13 @@ interface TrsmNodeGuardBadgeProps {
 }
 
 export const TrsmNodeGuardBadge: React.FC<TrsmNodeGuardBadgeProps> = ({
+  nodeId,
   status = 'active',
   isEnforced = true,
 }) => {
   return (
     <div
+      title={`TRSM Node Guard active on ${nodeId} (${status})`}
       style={{
         display: 'inline-flex',
         alignItems: 'center',
@@ -36,7 +38,14 @@ export const TrsmNodeGuardBadge: React.FC<TrsmNodeGuardBadgeProps> = ({
           width: '6px',
           height: '6px',
           borderRadius: '50%',
-          background: isEnforced ? '#10b981' : '#f59e0b',
+          background:
+            status === 'blocked'
+              ? '#f43f5e'
+              : status === 'running'
+              ? '#38bdf8'
+              : isEnforced
+              ? '#10b981'
+              : '#f59e0b',
         }}
       />
     </div>

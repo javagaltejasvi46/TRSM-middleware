@@ -12,6 +12,15 @@ export const workflowsApi = {
       method: 'POST',
       body: JSON.stringify(workflow),
     }),
+  update: (workflowId: string, workflow: WorkflowConfig) =>
+    apiRequest<WorkflowConfig>(`/api/workflows/${workflowId}`, {
+      method: 'PUT',
+      body: JSON.stringify(workflow),
+    }),
+  delete: (workflowId: string) =>
+    apiRequest<void>(`/api/workflows/${workflowId}`, {
+      method: 'DELETE',
+    }),
   list: () => apiRequest<WorkflowConfig[]>('/api/workflows'),
   get: (workflowId: string) =>
     apiRequest<WorkflowConfig>(`/api/workflows/${workflowId}`),
