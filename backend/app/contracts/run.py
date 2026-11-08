@@ -17,4 +17,5 @@ class RunResponse(BaseModel):
     status: str = "pending"  # pending, running, completed, failed
     state: Dict[str, Any] = Field(default_factory=dict)
     execution_history: List[NodeRunLog] = Field(default_factory=list)
+    gateway_events: List[Dict[str, Any]] = Field(default_factory=list)
     error: Optional[str] = None

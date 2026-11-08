@@ -13,3 +13,4 @@ class AgentExecutionResult(BaseModel):
     output_message: Optional[str] = None
     proposed_messages: List[AgentMessageProposal] = Field(default_factory=list)
     error_message: Optional[str] = None
+
