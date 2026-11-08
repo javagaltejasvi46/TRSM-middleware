@@ -31,3 +31,4 @@ class WorkflowResponse(BaseModel):
     id: str
     name: str
     definition: WorkflowDefinition
+

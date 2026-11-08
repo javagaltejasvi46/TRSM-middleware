@@ -112,3 +112,4 @@ def test_invalid_entry_point():
     )
     errors = validate_workflow_definition(wf)
     assert any("entry_point 'non_existent' does not match" in err for err in errors)
+

@@ -82,3 +82,4 @@ def validate_workflow_definition(workflow: WorkflowDefinition) -> List[str]:
                 )
 
     return errors
+
