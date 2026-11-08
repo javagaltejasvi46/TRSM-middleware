@@ -85,3 +85,4 @@ class CentralCommunicationGateway:
 
 # Global communication gateway instance
 communication_gateway = CentralCommunicationGateway()
+

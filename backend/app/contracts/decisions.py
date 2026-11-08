@@ -21,3 +21,4 @@ class PolicyDecision(BaseModel):
     threat_findings: List[ThreatFinding] = Field(default_factory=list)
     redacted_content: Optional[str] = None
     metadata: Dict[str, Any] = Field(default_factory=dict)
+

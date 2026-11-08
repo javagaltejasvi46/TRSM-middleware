@@ -105,3 +105,4 @@ def test_enforcement_in_workflow_execution():
     assert gw_event["recipient"] == "db_manager"
     assert gw_event["decision"] == "ALLOW"
     assert gw_event["delivered"] is True
+
