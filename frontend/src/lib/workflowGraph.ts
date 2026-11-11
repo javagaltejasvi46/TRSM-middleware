@@ -193,6 +193,19 @@ export function toWorkflowConfig(wf: WorkflowConfig): WorkflowConfig {
   return { ...wf, edges: deriveEdges(wf) };
 }
 
+/**
+ * Identity of what a run actually executes: entry node, agent configs and routes.
+ * Canvas layout and the workflow's display name are excluded, so moving a node or
+ * renaming the workflow does not invalidate the last run's results.
+ */
+export function executionSignature(wf: WorkflowConfig): string {
+  const nodes = wf.nodes.map(({ metadata, ...rest }) => {
+    const { [UI_POSITION_KEY]: _pos, ...meta } = metadata ?? {};
+    return { ...rest, metadata: meta };
+  });
+  return JSON.stringify({ entry: wf.entry_node_id, nodes, edges: deriveEdges(wf) });
+}
+
 export function exportWorkflowJson(wf: WorkflowConfig): string {
   return JSON.stringify(toWorkflowConfig(wf), null, 2);
 }

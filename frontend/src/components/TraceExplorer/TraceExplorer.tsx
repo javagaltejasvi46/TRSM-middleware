@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { AuditEvent, PolicyDecisionEnum } from '../../types';
 import {
   AlertTriangle,
@@ -22,6 +22,8 @@ interface TraceExplorerProps {
   events: AuditEvent[];
   selectedEventId?: string;
   onSelectEvent?: (event: AuditEvent) => void;
+  /** Set from outside (e.g. "View events" on an agent) to filter the trace to one agent. */
+  focusAgent?: { id: string; nonce: number } | null;
 }
 
 const DECISION_BADGE: Record<PolicyDecisionEnum, { cls: string; Icon: React.ElementType }> = {
@@ -46,8 +48,13 @@ const FAMILY_ICON: Record<string, React.ElementType> = {
 const dotTone = (d?: PolicyDecisionEnum | null) =>
   d === 'BLOCK' ? 'badge-block' : d === 'QUARANTINE' ? 'badge-quarantine' : d === 'REVIEW' ? 'badge-review' : d === 'ALLOW' ? 'badge-allow' : '';
 
-export const TraceExplorer: React.FC<TraceExplorerProps> = ({ events, selectedEventId, onSelectEvent }) => {
+export const TraceExplorer: React.FC<TraceExplorerProps> = ({ events, selectedEventId, onSelectEvent, focusAgent }) => {
   const [filters, setFilters] = useState<TraceFilters>(EMPTY_FILTERS);
+  // A new run's events replace the old ones: start unfiltered.
+  useEffect(() => setFilters(EMPTY_FILTERS), [events]);
+  useEffect(() => {
+    if (focusAgent) setFilters({ ...EMPTY_FILTERS, agent: focusAgent.id });
+  }, [focusAgent]);
   const options = useMemo(() => filterOptions(events), [events]);
   const visible = useMemo(() => filterEvents(events, filters), [events, filters]);
   const filtering = isFiltering(filters);

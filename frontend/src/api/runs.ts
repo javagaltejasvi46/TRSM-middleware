@@ -1,5 +1,5 @@
 import { apiRequest } from './client';
-import { WorkflowConfig } from '../types';
+import { RunSummary, WorkflowConfig } from '../types';
 
 export interface StartRunParams {
   workflow_id?: string;
@@ -9,10 +9,11 @@ export interface StartRunParams {
 }
 
 export const runsApi = {
+  /** Synchronous on the backend: resolves only after the whole run has finished. */
   start: (params: StartRunParams) =>
-    apiRequest<any>('/api/runs', {
+    apiRequest<RunSummary>('/api/runs', {
       method: 'POST',
       body: JSON.stringify(params),
     }),
-  get: (runId: string) => apiRequest<any>(`/api/runs/${runId}`),
+  get: (runId: string) => apiRequest<RunSummary>(`/api/runs/${runId}`),
 };

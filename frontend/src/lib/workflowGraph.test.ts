@@ -6,6 +6,7 @@ import {
   defaultWorkflow,
   deleteNode,
   deriveEdges,
+  executionSignature,
   exportWorkflowJson,
   findFreePosition,
   getPosition,
@@ -72,6 +73,18 @@ describe('node operations', () => {
     expect(wf.entry_node_id).toBe('db_manager_agent');
     const wf2 = deleteNode(defaultWorkflow(), 'qa_agent');
     expect(wf2.nodes.find((n) => n.node_id === 'db_manager_agent')!.allowed_peers).toEqual([]);
+  });
+});
+
+describe('executionSignature', () => {
+  it('ignores layout and the workflow name, but not agent config or routes', () => {
+    const wf = defaultWorkflow();
+    const sig = executionSignature(wf);
+    expect(executionSignature(moveNode(wf, 'qa_agent', { x: 999, y: 999 }))).toBe(sig);
+    expect(executionSignature({ ...wf, name: 'Renamed' })).toBe(sig);
+    expect(executionSignature(addPeer(wf, 'qa_agent', 'backend_agent'))).not.toBe(sig);
+    const qa = wf.nodes.find((n) => n.node_id === 'qa_agent')!;
+    expect(executionSignature(updateNode(wf, 'qa_agent', { ...qa, allowed_tools: [] }))).not.toBe(sig);
   });
 });
 

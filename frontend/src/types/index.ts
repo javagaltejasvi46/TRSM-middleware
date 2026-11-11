@@ -53,6 +53,18 @@ export interface WorkflowConfig {
   metadata?: Record<string, any>;
 }
 
+/** Mirrors RunSummaryResponse in backend/app/api/routes/runs.py. */
+export interface RunSummary {
+  run_id: string;
+  workflow_id: string;
+  status: string;
+  enable_trsm: boolean;
+  task: string;
+  total_messages: number;
+  total_tool_calls: number;
+  blocked_actions: number;
+}
+
 export interface WorkflowValidationResult {
   is_valid: boolean;
   errors: string[];

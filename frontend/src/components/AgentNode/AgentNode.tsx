@@ -2,16 +2,17 @@ import React from 'react';
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
 import { Bot, Flag, Timer } from 'lucide-react';
 import { TrsmNodeGuardBadge } from '../TrsmNodeGuardBadge/TrsmNodeGuardBadge';
-import { AgentNodeConfig, AgentStatus } from '../../types';
+import { AgentNodeConfig } from '../../types';
+import type { NodeRunStatus } from '../../lib/runState';
 import { ROLE_LABELS } from '../../lib/workflowGraph';
 
 export type AgentFlowNode = Node<
-  { config: AgentNodeConfig; isEntry: boolean; status: AgentStatus; hasIncoming: boolean; hasOutgoing: boolean },
+  { config: AgentNodeConfig; isEntry: boolean; status: NodeRunStatus; hasIncoming: boolean; hasOutgoing: boolean },
   'agent'
 >;
 
 /** Border tint per backend-reported status; the badge text carries the meaning too. */
-const STATUS_BORDER: Partial<Record<AgentStatus, string>> = {
+const STATUS_BORDER: Partial<Record<NodeRunStatus, string>> = {
   completed: '#a7f3d0',
   blocked: '#fca5a5',
   failed: '#fca5a5',

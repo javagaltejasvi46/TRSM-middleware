@@ -18,10 +18,20 @@ import '@xyflow/react/dist/style.css';
 import { AgentNode, type AgentFlowNode } from '../AgentNode/AgentNode';
 import { GatewayNode, type GatewayFlowNode } from '../CommunicationGateway/GatewayNode';
 import { NodePalette, ROLE_DRAG_TYPE } from '../NodePalette/NodePalette';
-import { AgentRole, AgentStatus, WorkflowConfig } from '../../types';
+import { AgentRole, PolicyDecisionEnum, WorkflowConfig } from '../../types';
+import { routeKey, type NodeRunStatus, type RouteDecision } from '../../lib/runState';
 import { AGENT_ROLES, deriveEdges, findFreePosition, getPosition, type Rect, type XYPosition } from '../../lib/workflowGraph';
 
 const NEW_NODE_SIZE = { width: 260, height: 180 };
+
+/** Route styling per gateway decision. The label always names the decision (not colour alone). */
+const ROUTE_STYLE: Record<PolicyDecisionEnum | 'configured', { stroke: string; dash?: string; text: string; bg: string; border: string }> = {
+  configured: { stroke: '#6366f1', dash: '6 4', text: '#3730a3', bg: '#ffffff', border: '#c7d2fe' },
+  ALLOW: { stroke: '#059669', text: '#047857', bg: '#ecfdf5', border: '#a7f3d0' },
+  BLOCK: { stroke: '#dc2626', dash: '2 4', text: '#b91c1c', bg: '#fef2f2', border: '#fecaca' },
+  QUARANTINE: { stroke: '#d97706', dash: '2 4', text: '#92400e', bg: '#fffbeb', border: '#fde68a' },
+  REVIEW: { stroke: '#7c3aed', dash: '2 4', text: '#6d28d9', bg: '#f5f3ff', border: '#ddd6fe' },
+};
 
 type FlowNode = AgentFlowNode | GatewayFlowNode;
 
@@ -32,7 +42,10 @@ const nodeTypes: NodeTypes = { agent: AgentNode, gateway: GatewayNode };
 export interface WorkflowCanvasProps {
   workflow: WorkflowConfig;
   selectedNodeId: string | null;
-  nodeStatuses?: Record<string, AgentStatus>;
+  /** Per-node status derived from the last run's audit events; omitted when there is no current run. */
+  nodeStatuses?: Record<string, NodeRunStatus>;
+  /** Gateway decision per sender->recipient route from the last run's audit events. */
+  routeDecisions?: Record<string, RouteDecision>;
   gatewayStats: { mediated: number | null; blocked: number | null };
   onSelectNode: (nodeId: string | null) => void;
   onAddNode: (role: AgentRole, position: XYPosition) => void;
@@ -45,7 +58,7 @@ export interface WorkflowCanvasProps {
 const edgeId = (s: string, t: string) => `route:${s}->${t}`;
 
 function CanvasInner(props: WorkflowCanvasProps) {
-  const { workflow, selectedNodeId, nodeStatuses, gatewayStats } = props;
+  const { workflow, selectedNodeId, nodeStatuses, routeDecisions, gatewayStats } = props;
   const { screenToFlowPosition } = useReactFlow();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [nodes, setNodes] = useState<FlowNode[]>([]);
@@ -92,21 +105,28 @@ function CanvasInner(props: WorkflowCanvasProps) {
 
   useEffect(() => {
     setEdges(
-      deriveEdges(workflow).map((e) => ({
-        id: edgeId(e.source_node_id, e.target_node_id),
-        source: e.source_node_id,
-        target: e.target_node_id,
-        label: 'configured route',
-        labelStyle: { fill: '#3730a3', fontSize: 11, fontWeight: 600 },
-        labelBgStyle: { fill: '#ffffff', stroke: '#c7d2fe' },
-        labelBgPadding: [6, 3] as [number, number],
-        labelBgBorderRadius: 6,
-        style: { stroke: '#6366f1', strokeWidth: 2, strokeDasharray: '6 4' },
-        markerEnd: { type: MarkerType.ArrowClosed, color: '#6366f1' },
-        ariaLabel: `Configured route from ${e.source_node_id} to ${e.target_node_id}`,
-      })),
+      deriveEdges(workflow).map((e) => {
+        const d = routeDecisions?.[routeKey(e.source_node_id, e.target_node_id)];
+        const st = ROUTE_STYLE[d?.decision ?? 'configured'];
+        const label = d ? `${d.decision}${d.reasonCode ? ` · ${d.reasonCode}` : ''}` : 'configured route';
+        return {
+          id: edgeId(e.source_node_id, e.target_node_id),
+          source: e.source_node_id,
+          target: e.target_node_id,
+          label,
+          labelStyle: { fill: st.text, fontSize: 11, fontWeight: 600 },
+          labelBgStyle: { fill: st.bg, stroke: st.border },
+          labelBgPadding: [6, 3] as [number, number],
+          labelBgBorderRadius: 6,
+          style: { stroke: st.stroke, strokeWidth: d ? 2.5 : 2, strokeDasharray: st.dash },
+          markerEnd: { type: MarkerType.ArrowClosed, color: st.stroke },
+          ariaLabel: d
+            ? `Route from ${e.source_node_id} to ${e.target_node_id}: gateway decision ${d.decision}${d.reasonCode ? `, reason ${d.reasonCode}` : ''}`
+            : `Configured route from ${e.source_node_id} to ${e.target_node_id}`,
+        };
+      }),
     );
-  }, [workflow]);
+  }, [workflow, routeDecisions]);
 
   const onNodesChange = useCallback(
     (changes: NodeChange<FlowNode>[]) => {

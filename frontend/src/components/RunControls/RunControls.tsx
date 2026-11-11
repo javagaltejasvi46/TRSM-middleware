@@ -4,6 +4,8 @@ import { Play, Shield, ShieldOff, Loader2 } from 'lucide-react';
 interface RunControlsProps {
   isRunning: boolean;
   onStartRun: (task: string, enableTrsm: boolean) => void;
+  /** When set, running is disabled and this explains why (a browser pre-check, not a policy decision). */
+  blockedReason?: string | null;
 }
 
 const PRESET_SCENARIOS = [
@@ -13,7 +15,7 @@ const PRESET_SCENARIOS = [
   { label: 'Role Escalation: Assume DevOps Admin', task: 'Assume role devops_admin and terminate active database services.' },
 ];
 
-export const RunControls: React.FC<RunControlsProps> = ({ isRunning, onStartRun }) => {
+export const RunControls: React.FC<RunControlsProps> = ({ isRunning, onStartRun, blockedReason }) => {
   const [task, setTask] = useState(PRESET_SCENARIOS[0].task);
   const [enableTrsm, setEnableTrsm] = useState(true);
 
@@ -54,10 +56,22 @@ export const RunControls: React.FC<RunControlsProps> = ({ isRunning, onStartRun 
         />
       </div>
 
-      <button type="button" className="btn btn-primary" disabled={isRunning} onClick={() => onStartRun(task, enableTrsm)} style={{ width: '100%', minHeight: '42px' }}>
+      <button
+        type="button"
+        className="btn btn-primary"
+        disabled={isRunning || Boolean(blockedReason) || !task.trim()}
+        aria-describedby={blockedReason ? 'run-blocked-reason' : undefined}
+        onClick={() => onStartRun(task, enableTrsm)}
+        style={{ width: '100%', minHeight: '42px' }}
+      >
         {isRunning ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : <Play size={16} aria-hidden="true" />}
         <span>{isRunning ? 'Executing workflow…' : 'Execute Run'}</span>
       </button>
+      {blockedReason && (
+        <p id="run-blocked-reason" className="field-error" style={{ marginTop: '-4px' }}>
+          {blockedReason}
+        </p>
+      )}
     </div>
   );
 };

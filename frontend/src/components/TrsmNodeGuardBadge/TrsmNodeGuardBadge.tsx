@@ -1,14 +1,14 @@
 import React from 'react';
-import { ShieldCheck, ShieldAlert, ShieldX, ShieldQuestion, Loader2 } from 'lucide-react';
-import { AgentStatus } from '../../types';
+import { ShieldCheck, ShieldAlert, ShieldX, ShieldQuestion, Loader2, CircleDashed } from 'lucide-react';
+import type { NodeRunStatus } from '../../lib/runState';
 
 interface TrsmNodeGuardBadgeProps {
   nodeId: string;
   /** Runtime status reported by the backend; 'idle' until a run reports otherwise. */
-  status?: AgentStatus;
+  status?: NodeRunStatus;
 }
 
-const STATUS_DISPLAY: Record<AgentStatus, { label: string; color: string; Icon: React.ElementType }> = {
+const STATUS_DISPLAY: Record<NodeRunStatus, { label: string; color: string; Icon: React.ElementType }> = {
   idle: { label: 'Idle', color: 'var(--text-secondary)', Icon: ShieldCheck },
   running: { label: 'Running', color: 'var(--accent-text)', Icon: Loader2 },
   completed: { label: 'Completed', color: 'var(--status-allow)', Icon: ShieldCheck },
@@ -16,6 +16,7 @@ const STATUS_DISPLAY: Record<AgentStatus, { label: string; color: string; Icon: 
   quarantined: { label: 'Quarantined', color: 'var(--status-quarantine)', Icon: ShieldAlert },
   failed: { label: 'Failed', color: 'var(--status-block)', Icon: ShieldX },
   review_required: { label: 'Awaiting review', color: 'var(--status-review)', Icon: ShieldQuestion },
+  not_reached: { label: 'Not reached', color: 'var(--text-muted)', Icon: CircleDashed },
 };
 
 /**
