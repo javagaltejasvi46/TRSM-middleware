@@ -23,3 +23,4 @@ class ResourceExecutionResult(BaseModel):
     result: Optional[Any] = None
     error: Optional[str] = None
     provenance: Dict[str, Any] = Field(default_factory=dict)
+

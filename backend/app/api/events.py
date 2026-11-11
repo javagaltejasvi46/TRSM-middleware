@@ -1,29 +1,34 @@
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
-from typing import List, Dict, Any
+from fastapi import APIRouter, HTTPException, Query, status
+from typing import List, Optional
+from backend.app.contracts.events import AuditEvent
+from backend.app.persistence.event_repository import event_repository
 
 router = APIRouter()
 
-class Event(BaseModel):
-    event_id: str
-    run_id: str
-    event_type: str
-    timestamp: str
-    payload: Dict[str, Any] = Field(default_factory=dict)
+@router.get("/events", response_model=List[AuditEvent])
+async def list_events(
+    run_id: Optional[str] = Query(None, description="Filter events by run ID"),
+    actor_id: Optional[str] = Query(None, description="Filter events by actor ID"),
+    event_type: Optional[str] = Query(None, description="Filter events by event type"),
+    policy_decision: Optional[str] = Query(None, description="Filter events by policy decision (ALLOW, BLOCK, etc.)"),
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0)
+):
+    return event_repository.list_events(
+        run_id=run_id,
+        actor_id=actor_id,
+        event_type=event_type,
+        policy_decision=policy_decision,
+        limit=limit,
+        offset=offset
+    )
 
-# In‑memory placeholder store
-_EVENTS: List[Event] = []
-
-@router.get("/events", response_model=List[Event])
-async def list_events(run_id: str | None = None):
-    if run_id:
-        return [e for e in _EVENTS if e.run_id == run_id]
-    return _EVENTS
-
-@router.get("/events/{event_id}", response_model=Event)
+@router.get("/events/{event_id}", response_model=AuditEvent)
 async def get_event(event_id: str):
-    for e in _EVENTS:
-        if e.event_id == event_id:
-            return e
-    raise HTTPException(status_code=404, detail="Event not found")
-
+    evt = event_repository.get_event(event_id)
+    if not evt:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Event with ID '{event_id}' not found."
+        )
+    return evt

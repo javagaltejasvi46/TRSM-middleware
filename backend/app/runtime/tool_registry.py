@@ -38,3 +38,4 @@ class ToolRegistry:
         self.register_tool("echo_tool", echo_tool)
 
 tool_registry = ToolRegistry()
+

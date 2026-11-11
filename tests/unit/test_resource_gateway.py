@@ -70,3 +70,4 @@ def test_destructive_query_blocked():
     assert event.decision == DecisionType.BLOCK
     assert event.reason_code == "DESTRUCTIVE_DB_OPERATION_BLOCKED"
     assert event.executed is False
+

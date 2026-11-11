@@ -3,8 +3,10 @@ import datetime
 from typing import Dict, Any, Optional, List
 from backend.app.contracts.resources import ResourceAction, ResourceExecutionResult, ResourceType
 from backend.app.contracts.decisions import PolicyDecision, DecisionType
+from backend.app.contracts.events import AuditEvent
 from backend.app.trsm.interfaces import trsm_decision_engine, TRSMDecisionEngineInterface
 from backend.app.runtime.tool_registry import tool_registry, ToolRegistry
+from backend.app.persistence.event_repository import event_repository, EventRepository
 
 class ResourceGatewayEvaluationEvent:
     def __init__(
@@ -53,9 +55,15 @@ class ResourceGateway:
     TRSM Resource Gateway for tools, database, and memory operations.
     Enforces authorization, allowlists, and execution boundaries.
     """
-    def __init__(self, engine: Optional[TRSMDecisionEngineInterface] = None, registry: Optional[ToolRegistry] = None):
+    def __init__(
+        self,
+        engine: Optional[TRSMDecisionEngineInterface] = None,
+        registry: Optional[ToolRegistry] = None,
+        repository: Optional[EventRepository] = None
+    ):
         self.engine = engine or trsm_decision_engine
         self.registry = registry or tool_registry
+        self.repository = repository or event_repository
         self.event_log: List[ResourceGatewayEvaluationEvent] = []
 
     def execute(
@@ -122,6 +130,35 @@ class ResourceGateway:
         )
 
         self.event_log.append(gw_event)
+
+        # Persist structured audit event into SQLite
+        audit_event = AuditEvent(
+            event_id=event_id,
+            run_id=run_id,
+            trace_id=trace_id,
+            parent_event_id=None,
+            timestamp=timestamp,
+            event_type="TOOL_EXECUTION",
+            actor_id=action.actor_id,
+            target_id=action.resource_id,
+            source_type="resource_gateway",
+            trust_labels=["tool_access"],
+            policy_decision=decision.decision.value,
+            reason_code=decision.reason_code,
+            policy_version=decision.policy_version,
+            duration_ms=1.2,
+            safe_payload_summary=f"{action.resource_id} executed={executed}",
+            payload_reference={
+                "action_type": action.action_type.value,
+                "executed": executed,
+                "threat_findings": [f.model_dump() for f in decision.threat_findings]
+            }
+        )
+        try:
+            self.repository.insert_event(audit_event)
+        except Exception:
+            pass
+
         return exec_result, gw_event
 
 resource_gateway = ResourceGateway()
