@@ -1,106 +1,33 @@
 """Workflow orchestrator mediating multi-agent runs."""
 
-import uuid
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
-from backend.app.contracts.run import NodeRunLog, RunResponse
-from backend.app.contracts.workflow import WorkflowDefinition
-from backend.app.runtime.graph_compiler import compile_workflow_to_langgraph
-from backend.app.runtime.communication_gateway import (
-    AgentCommunicationGateway,
-    CentralCommunicationGateway,
-    communication_gateway,
-)
-from backend.app.runtime.resource_gateway import ControlledResourceGateway
-from backend.app.runtime.node_guard import NodeGuard
-from backend.app.runtime.adapters.mock_adapter import MockAgentAdapter
 from ..schemas.events import AuditEventType
+from ..schemas.messages import AgentMessageProposal
 from ..schemas.policy import PolicyDecisionEnum
 from ..schemas.resources import ResourceActionRequest, ResourceActionType
 from ..schemas.workflow import WorkflowConfig
 from ..audit.event_collector import AuditEventCollector
+from .communication_gateway import AgentCommunicationGateway
+from .node_guard import NodeGuard
+from .resource_gateway import ControlledResourceGateway
+from .adapters.mock_adapter import MockAgentAdapter
 
 
 class Orchestrator:
-    """Orchestrates execution of a multi-agent workflow (synchronous and async modes)."""
+    """Orchestrates execution of a multi-agent workflow."""
 
     def __init__(
         self,
         comm_gateway: Optional[AgentCommunicationGateway] = None,
         resource_gateway: Optional[ControlledResourceGateway] = None,
         event_collector: Optional[AuditEventCollector] = None,
-        gateway: Optional[CentralCommunicationGateway] = None,
     ):
-        self._runs: Dict[str, RunResponse] = {}
-        self.gateway = gateway or communication_gateway
         self.comm_gateway = comm_gateway or AgentCommunicationGateway()
         self.resource_gateway = resource_gateway or ControlledResourceGateway()
         self.event_collector = event_collector or AuditEventCollector()
         self.mock_adapter = MockAgentAdapter()
-
-    def get_run(self, run_id: str) -> Optional[RunResponse]:
-        return self._runs.get(run_id)
-
-    def list_runs(self) -> List[RunResponse]:
-        return list(self._runs.values())
-
-    def execute_workflow(
-        self,
-        workflow_id: str,
-        workflow: WorkflowDefinition,
-        initial_params: Dict[str, Any],
-    ) -> RunResponse:
-        run_id = f"run-{uuid.uuid4().hex[:8]}"
-        run_record = RunResponse(
-            run_id=run_id,
-            workflow_id=workflow_id,
-            status="running",
-            state=initial_params,
-            execution_history=[],
-            gateway_events=[],
-        )
-        self._runs[run_id] = run_record
-
-        try:
-            compiled_graph = compile_workflow_to_langgraph(
-                workflow=workflow,
-                run_id=run_id,
-                gateway=self.gateway,
-            )
-
-            initial_state = {
-                "current_node": "",
-                "messages": [],
-                "inbox": {},
-                "data": dict(initial_params),
-                "history": [],
-                "gateway_events": [],
-            }
-
-            final_state = compiled_graph.invoke(initial_state)
-
-            history_entries = [
-                NodeRunLog(
-                    node_id=item["node_id"],
-                    status=item["status"],
-                    output=item.get("output"),
-                    error=item.get("error"),
-                )
-                for item in final_state.get("history", [])
-            ]
-
-            run_record.status = "completed"
-            run_record.state = final_state.get("data", {})
-            run_record.execution_history = history_entries
-            run_record.gateway_events = final_state.get("gateway_events", [])
-
-        except Exception as ex:
-            run_record.status = "failed"
-            run_record.error = str(ex)
-
-        self._runs[run_id] = run_record
-        return run_record
 
     async def run_workflow(
         self,
@@ -108,7 +35,7 @@ class Orchestrator:
         initial_task: str,
         enable_trsm: bool = True,
     ) -> Dict[str, Any]:
-        """Execute a workflow run through mediated gateways (Async Mode)."""
+        """Execute a workflow run through mediated gateways."""
         run_id = str(uuid4())
         trace_id = str(uuid4())
 
@@ -158,6 +85,7 @@ class Orchestrator:
         for step in range(5):
             visited_nodes.append(current_node_id)
 
+            # Determine proposed resource action based on task intent or node configuration
             lower_task = current_payload.lower()
             if "bash_shell" in lower_task or "unknown_tool" in lower_task:
                 tool_name = "bash_shell"
@@ -211,6 +139,7 @@ class Orchestrator:
             # Check outgoing edge
             edge = next((e for e in workflow.edges if e.source_node_id == current_node_id), None)
             if not edge:
+                # Reached leaf node
                 break
 
             target_node_id = edge.target_node_id
@@ -228,8 +157,10 @@ class Orchestrator:
 
             if decision.outcome != PolicyDecisionEnum.ALLOW:
                 blocked_actions += 1
+                # Message was blocked; receiver does not receive payload
                 break
 
+            # Move to next node
             current_node_id = target_node_id
             entry_node = next((n for n in workflow.nodes if n.node_id == current_node_id), None)
             if not entry_node:
@@ -258,7 +189,3 @@ class Orchestrator:
             "total_tool_calls": total_tool_calls,
             "blocked_actions": blocked_actions,
         }
-
-
-# Global singleton orchestrator
-orchestrator = Orchestrator()
