@@ -180,3 +180,4 @@ def test_scenario_c_blocked_resource_and_privilege_escalation():
     # Verify audit trail contains blocked tool events
     blocked_tool_events = repo.list_events(run_id="run-priv-test", policy_decision="BLOCK")
     assert len(blocked_tool_events) == 2
+
