@@ -79,6 +79,8 @@ function CanvasInner(props: WorkflowCanvasProps) {
         deletable: false,
         connectable: false,
         selectable: false,
+        // Not interactive, so keep it out of the keyboard tab order.
+        focusable: false,
         // Behind the routes, so routes crossing the centre stay visible and clickable.
         zIndex: -1,
       };
@@ -132,6 +134,11 @@ function CanvasInner(props: WorkflowCanvasProps) {
     (changes: NodeChange<FlowNode>[]) => {
       setNodes((nds) => applyNodeChanges(changes, nds));
       for (const c of changes) {
+        // Keyboard moves (arrow keys) arrive as position changes with no drag in progress;
+        // commit them so the next rebuild from the workflow does not snap the node back.
+        if (c.type === 'position' && c.position && !c.dragging && c.id !== GATEWAY_NODE_ID) {
+          props.onMoveNode(c.id, c.position);
+        }
         if (c.type === 'select' && c.id !== GATEWAY_NODE_ID) {
           if (c.selected) props.onSelectNode(c.id);
           else if (c.id === selectedNodeId) props.onSelectNode(null);
