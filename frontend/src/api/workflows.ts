@@ -1,9 +1,9 @@
 import { apiRequest } from './client';
-import { WorkflowConfig } from '../types';
+import { WorkflowConfig, WorkflowValidationResult } from '../types';
 
 export const workflowsApi = {
   validate: (workflow: WorkflowConfig) =>
-    apiRequest<{ is_valid: boolean; errors: string[]; warnings: string[] }>(
+    apiRequest<WorkflowValidationResult>(
       '/api/workflows/validate',
       { method: 'POST', body: JSON.stringify(workflow) }
     ),

@@ -53,6 +53,24 @@ export interface WorkflowConfig {
   metadata?: Record<string, any>;
 }
 
+/** Mirrors RunSummaryResponse in backend/app/api/routes/runs.py. */
+export interface RunSummary {
+  run_id: string;
+  workflow_id: string;
+  status: string;
+  enable_trsm: boolean;
+  task: string;
+  total_messages: number;
+  total_tool_calls: number;
+  blocked_actions: number;
+}
+
+export interface WorkflowValidationResult {
+  is_valid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
 export interface AuditEvent {
   event_id: string;
   run_id: string;
@@ -92,4 +110,14 @@ export interface RunMetrics {
   total_tool_calls: number;
   avg_latency_ms: number;
   p95_latency_ms: number;
+}
+
+/** Mirrors RunComparisonResult in backend/app/api/routes/metrics.py. */
+export interface RunComparison {
+  baseline_run_id: string;
+  protected_run_id: string;
+  baseline_metrics: RunMetrics;
+  protected_metrics: RunMetrics;
+  overhead_ms: number;
+  security_delta: string;
 }

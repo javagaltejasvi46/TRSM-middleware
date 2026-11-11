@@ -1,21 +1,58 @@
+/*
+ * TRSM light "layered depth" theme (Soft UI Evolution).
+ * Depth comes from stacked soft shadows, lit top edges and a slab under raised
+ * elements. Every text colour below meets 4.5:1 on its intended surface.
+ */
 :root {
-  --bg-primary: #090d16;
-  --bg-secondary: #0f172a;
-  --bg-card: rgba(15, 23, 42, 0.75);
-  --bg-card-hover: rgba(30, 41, 59, 0.85);
-  --border-color: rgba(51, 65, 85, 0.6);
-  --border-glow: rgba(99, 102, 241, 0.3);
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  --accent-primary: #6366f1;
-  --accent-glow: #818cf8;
-  --status-allow: #10b981;
-  --status-block: #ef4444;
-  --status-quarantine: #f59e0b;
-  --status-review: #8b5cf6;
+  color-scheme: light;
+
+  /* Surfaces */
+  --bg-primary: #f5f3ff;
+  --surface: #ffffff;
+  --surface-sunken: #f4f5fd;
+  --surface-hover: #eef2ff;
+  --canvas-bg: #fafaff;
+
+  /* Text */
+  --text-primary: #1e1b4b;   /* 15.9:1 on white */
+  --text-secondary: #475569; /* 7.6:1 on white */
+  --text-muted: #556070;     /* 6.3:1 on white, 5.8:1 on --surface-sunken */
+
+  /* Lines */
+  --border-color: #e0e7ff;
+  --border-strong: #c7d2fe;
+  --input-border: #a5b4fc;
+
+  /* Brand */
+  --accent-primary: #4f46e5; /* 6.3:1 with white text */
+  --accent-hover: #4338ca;
+  --accent-slab: #3730a3;
+  --accent-soft: #eef2ff;
+  --accent-text: #4338ca;
+  --info-text: #0369a1;
+
+  /* Status (text colours, with matching soft backgrounds below) */
+  --status-allow: #047857;
+  --status-block: #b91c1c;
+  --status-quarantine: #b45309;
+  --status-review: #6d28d9;
+  --ok-text: #047857;
+  --warn-text: #92400e;
+  --error-text: #b91c1c;
+
+  /* Depth */
+  --shadow-1: 0 1px 2px rgba(30, 27, 75, 0.06), 0 1px 3px rgba(30, 27, 75, 0.06);
+  --shadow-2: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 1px 2px rgba(30, 27, 75, 0.05), 0 4px 12px rgba(30, 27, 75, 0.07),
+    0 12px 32px -8px rgba(79, 70, 229, 0.1);
+  --shadow-3: inset 0 1px 0 rgba(255, 255, 255, 1), 0 2px 4px rgba(30, 27, 75, 0.06), 0 10px 24px rgba(30, 27, 75, 0.1),
+    0 24px 48px -12px rgba(79, 70, 229, 0.25);
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 }
 
 * {
@@ -26,67 +63,336 @@
 
 body {
   background-color: var(--bg-primary);
+  background-image: radial-gradient(1200px 600px at 0% -10%, #e0e7ff 0%, transparent 60%),
+    radial-gradient(900px 500px at 100% 0%, #e0f2fe 0%, transparent 55%),
+    radial-gradient(800px 600px at 50% 110%, #ede9fe 0%, transparent 60%);
+  background-attachment: fixed;
   color: var(--text-primary);
   font-family: var(--font-sans);
   line-height: 1.5;
   overflow-x: hidden;
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
 }
 
-code, pre {
+code,
+pre {
   font-family: var(--font-mono);
 }
 
-/* Glassmorphism utility */
-.glass-panel {
-  background: var(--bg-card);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+/* Raised surface: the base card for every panel */
+.surface {
+  background: linear-gradient(180deg, #ffffff 0%, #fcfcff 100%);
   border: 1px solid var(--border-color);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-2);
 }
 
-.glass-panel:hover {
-  border-color: var(--border-glow);
+/* Interactive card that lifts toward the viewer */
+.surface-lift {
+  transition: transform 250ms var(--ease-out), box-shadow 250ms var(--ease-out), border-color 200ms ease;
+}
+.surface-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-3);
+}
+.surface-lift.is-selected {
+  transform: translateY(-3px);
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.18), var(--shadow-3);
 }
 
-/* Status Badges */
+/* Inset well: tiles and list items sitting inside a surface */
+.well {
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: inset 0 1px 2px rgba(30, 27, 75, 0.05);
+}
+
+/* Icon chip */
+.icon-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px;
+  border-radius: 10px;
+  color: var(--accent-text);
+  background: linear-gradient(180deg, #ffffff 0%, var(--accent-soft) 100%);
+  border: 1px solid var(--border-strong);
+  box-shadow: inset 0 1px 0 #ffffff, 0 2px 4px rgba(79, 70, 229, 0.12);
+}
+
+/* Decision / status badges: text + soft background + border (never colour alone) */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
 .badge-allow {
-  background: rgba(16, 185, 129, 0.15);
+  background: #ecfdf5;
   color: var(--status-allow);
-  border: 1px solid rgba(16, 185, 129, 0.4);
+  border: 1px solid #a7f3d0;
 }
-
 .badge-block {
-  background: rgba(239, 68, 68, 0.15);
+  background: #fef2f2;
   color: var(--status-block);
-  border: 1px solid rgba(239, 68, 68, 0.4);
+  border: 1px solid #fecaca;
 }
-
 .badge-quarantine {
-  background: rgba(245, 158, 11, 0.15);
+  background: #fffbeb;
   color: var(--status-quarantine);
-  border: 1px solid rgba(245, 158, 11, 0.4);
+  border: 1px solid #fde68a;
 }
-
 .badge-review {
-  background: rgba(139, 92, 246, 0.15);
+  background: #f5f3ff;
   color: var(--status-review);
-  border: 1px solid rgba(139, 92, 246, 0.4);
+  border: 1px solid #ddd6fe;
 }
 
-/* Custom Scrollbar */
+/* Buttons: primary is a pressable slab */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-primary);
+  transition: transform 150ms var(--ease-out), box-shadow 150ms var(--ease-out), background-color 150ms ease, border-color 150ms ease;
+}
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.btn-primary {
+  background: linear-gradient(180deg, #6366f1 0%, var(--accent-primary) 100%);
+  border-color: var(--accent-hover);
+  color: #ffffff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 3px 0 var(--accent-slab), 0 6px 14px rgba(79, 70, 229, 0.3);
+}
+.btn-primary:hover:not(:disabled) {
+  background: linear-gradient(180deg, #5b5ff0 0%, var(--accent-hover) 100%);
+}
+.btn-primary:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 1px 0 var(--accent-slab), 0 2px 6px rgba(79, 70, 229, 0.3);
+}
+.btn-secondary {
+  background: linear-gradient(180deg, #ffffff 0%, #f8f9ff 100%);
+  box-shadow: inset 0 1px 0 #ffffff, 0 2px 0 var(--border-strong), 0 3px 8px rgba(30, 27, 75, 0.06);
+}
+.btn-secondary:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: var(--input-border);
+}
+.btn-secondary:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: inset 0 1px 0 #ffffff, 0 1px 0 var(--border-strong);
+}
+.btn-danger {
+  color: var(--status-block);
+  border-color: #fecaca;
+  background: #ffffff;
+  box-shadow: 0 2px 0 #fecaca;
+}
+.btn-danger:hover:not(:disabled) {
+  background: #fef2f2;
+}
+.btn-danger:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 #fecaca;
+}
+
+/* Form fields: inset wells */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.field-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.field-help {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.field-error {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--error-text);
+}
+.field-input {
+  width: 100%;
+  min-height: 36px;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--input-border);
+  background: var(--surface-sunken);
+  box-shadow: inset 0 1px 2px rgba(30, 27, 75, 0.06);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
+}
+.field-input:focus {
+  background: #ffffff;
+  border-color: var(--accent-primary);
+}
+.field-input::placeholder {
+  color: var(--text-muted);
+}
+.field-input[aria-invalid='true'] {
+  border-color: var(--status-block);
+  background: #fffafa;
+}
+input[type='checkbox'] {
+  accent-color: var(--accent-primary);
+  width: 16px;
+  height: 16px;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* Running agent node (pattern adapted from 21st.dev "AI Agent Workflow Node Card"):
+   a moving gradient ring + soft glow + a sweep along the top edge. Continuous motion
+   is reserved for this genuine in-progress state; reduced motion holds it still. */
+@property --agent-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+@keyframes agent-spin {
+  to {
+    --agent-angle: 360deg;
+  }
+}
+@keyframes agent-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+@keyframes agent-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(350%);
+  }
+}
+.agent-node.is-running::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: calc(var(--radius-md) + 1px);
+  padding: 2px;
+  background: conic-gradient(from var(--agent-angle), #8b5cf6, #4f46e5, #0ea5e9, #8b5cf6);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  animation: agent-spin 3s linear infinite;
+  pointer-events: none;
+  z-index: 2;
+}
+.agent-glow {
+  position: absolute;
+  inset: -6px;
+  z-index: -1;
+  border-radius: 20px;
+  background: conic-gradient(from var(--agent-angle), #8b5cf6, #4f46e5, #0ea5e9, #8b5cf6);
+  filter: blur(16px);
+  animation: agent-spin 3s linear infinite, agent-pulse 2.2s ease-in-out infinite;
+  pointer-events: none;
+}
+.agent-sweep {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 2px;
+  width: 33%;
+  background: linear-gradient(90deg, transparent, #4f46e5, transparent);
+  animation: agent-sweep 1.6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* React Flow light-theme touches */
+.react-flow__controls {
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  box-shadow: var(--shadow-2) !important;
+}
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: var(--accent-hover) !important;
+  stroke-width: 3 !important;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+  .surface-lift:hover,
+  .surface-lift.is-selected {
+    transform: none;
+  }
+  /* Keep the running ring and glow visible, just not moving. */
+  .agent-node.is-running::after,
+  .agent-glow,
+  .agent-sweep {
+    animation: none !important;
+  }
+  .agent-glow {
+    opacity: 0.45;
+  }
+}
+
+/* Scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--bg-primary);
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: var(--border-strong);
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: var(--input-border);
 }
