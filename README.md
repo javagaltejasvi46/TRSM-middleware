@@ -53,7 +53,7 @@ flowchart TD
 
 ### Core Invariants
 
-- **Mandatory Message Mediation:** Every inter-agent message is intercepted and mediated by the backend `Agent Communication Gateway`.
+- **Mandatory Message Mediation:** Every inter-agent message is intercepted and mediated by the backend `CentralCommunicationGateway`.
 - **Independent Resource Authorization:** Tool, database, and memory access must independently pass through the `Controlled Resource Gateway`.
 - **Authoritative Decisions:** Security outcomes (`ALLOW`, `BLOCK`, `QUARANTINE`, `REVIEW`) are strictly decided by the backend Policy Engine. The frontend is a visualization and configuration interface, not a security boundary.
 - **Causal Tracing:** Every message proposal, decision, and tool action maintains immutable provenance and causal links (`run_id`, `trace_id`, `event_id`, `parent_event_id`).
@@ -63,7 +63,7 @@ flowchart TD
 ## 2. Project Status & Roadmap
 
 - **Status:** Initial Scaffold & Specification Complete (Pre-MVP Phase).
-- **Milestone 1:** Canonical Pydantic contracts and deterministic vertical slice (In Progress).
+- **Milestone 1:** Canonical Pydantic contracts and deterministic vertical slice (Complete).
 - **Milestone 2:** Visual React Flow canvas, node guard badges, and live trace explorer.
 - **Milestone 3:** Provenance propagation and threat detectors (Prompt Injection, Memory Poisoning, Role Hijacking).
 - **Milestone 4:** CSS/TUE metric calculation and baseline vs. protected evaluation harness.
@@ -80,6 +80,7 @@ TRSM-middleware/
 ├── TRSM_MASTER_PROJECT_SPEC.md         # Master project specification
 │
 ├── docs/                               # Architectural & research documentation
+│   ├── openapi.json                    # Exported OpenAPI specifications
 │   ├── architecture/                   # Architectural overviews & gateway mechanics
 │   ├── decisions/                      # Architecture Decision Records (ADRs)
 │   ├── design/                         # System, module, and API designs
@@ -89,7 +90,8 @@ TRSM-middleware/
 │
 ├── backend/                            # Python / FastAPI / LangGraph service
 │   ├── app/
-│   │   ├── api/                        # HTTP routes & dependencies
+│   │   ├── api/                        # HTTP routes & dependencies (Workflows, Runs, Events, Metrics)
+│   │   ├── contracts/                  # Wire contracts & data transfer models
 │   │   ├── schemas/                    # Canonical Pydantic models (single source of truth)
 │   │   ├── runtime/                    # Orchestrator, gateways, and adapters (Yashwanth)
 │   │   ├── trsm/                       # Policy engine, guardian, provenance (Tejasvi)
@@ -113,6 +115,9 @@ TRSM-middleware/
 │   └── resource_authorization/         # Unauthorized tool/db operations
 │
 ├── scripts/                            # Development, testing, and type sync scripts
+│   ├── run_demo.py                     # Demonstration and scenario runner
+│   ├── run_evaluation.py               # Comparative evaluation harness
+│   └── test.ps1                        # PowerShell test suite runner
 └── artifacts/                          # Sanitized experiment results & trace exports
 ```
 
@@ -166,15 +171,26 @@ Frontend visual playground will be running at `http://localhost:5173`.
 
 ---
 
-## 6. Running Tests & Deterministic Demo
+## 6. Running Tests & Demonstrations
 
+### Complete Test Suites
 ```bash
-# Run backend test suite
-cd backend
+# Run both Yashwanth & Tejasvi test suites
 pytest -v
 
-# Run the deterministic vertical slice scenario
-python ../scripts/run_demo.py --scenario scenarios/benign/backend_to_db_allowed.yaml
+# Or run backend test suite alone
+python -m pytest backend/tests -v
+```
+
+### Demonstration & Scenario Runner
+```bash
+# Full interactive end-to-end demonstration
+python scripts/run_demo.py
+
+# Specific security scenarios
+python scripts/run_demo.py --scenario benign
+python scripts/run_demo.py --scenario injection
+python scripts/run_demo.py --scenario poisoning
 ```
 
 ---

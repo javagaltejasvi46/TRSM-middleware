@@ -1,1 +1,2 @@
-"""FastAPI API package."""
+# backend/app/api/__init__.py
+

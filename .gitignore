@@ -29,6 +29,9 @@ htmlcov/
 venv/
 ENV/
 
+# Development Phase Notes
+PHASES.md
+
 # Node / Frontend
 node_modules/
 frontend/dist/

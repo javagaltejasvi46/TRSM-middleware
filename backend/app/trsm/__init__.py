@@ -13,6 +13,7 @@ from .policy_rules import (
 )
 from .provenance import ProvenanceTracker
 from .runtime_guardian import RuntimeGuardian
+from .interfaces import TRSMDecisionEngineInterface, trsm_decision_engine
 
 __all__ = [
     "BasePolicyRule",
@@ -20,7 +21,6 @@ __all__ = [
     "LabelTracker",
     "MalformedRequestRule",
     "PeerCommunicationRule",
-    "PolicyDecision",
     "PolicyEngine",
     "PolicyEvidence",
     "ProvenanceIntegrityRule",
@@ -28,4 +28,6 @@ __all__ = [
     "ResourceAuthorizationRule",
     "RuleEvaluationResult",
     "RuntimeGuardian",
+    "TRSMDecisionEngineInterface",
+    "trsm_decision_engine",
 ]
