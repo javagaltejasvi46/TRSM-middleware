@@ -111,3 +111,13 @@ export interface RunMetrics {
   avg_latency_ms: number;
   p95_latency_ms: number;
 }
+
+/** Mirrors RunComparisonResult in backend/app/api/routes/metrics.py. */
+export interface RunComparison {
+  baseline_run_id: string;
+  protected_run_id: string;
+  baseline_metrics: RunMetrics;
+  protected_metrics: RunMetrics;
+  overhead_ms: number;
+  security_delta: string;
+}
