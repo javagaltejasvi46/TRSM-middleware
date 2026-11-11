@@ -21,3 +21,4 @@ class AuditEvent(BaseModel):
     duration_ms: Optional[float] = Field(None, description="Execution duration in milliseconds")
     safe_payload_summary: Optional[str] = Field(None, description="Redacted or safe summary preview")
     payload_reference: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Metadata or structured payload references")
+

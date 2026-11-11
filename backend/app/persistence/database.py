@@ -40,3 +40,4 @@ def init_db(db_path: str = DEFAULT_DB_PATH):
         conn.execute("CREATE INDEX IF NOT EXISTS idx_events_event_type ON audit_events(event_type)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_events_policy_decision ON audit_events(policy_decision)")
     conn.close()
+

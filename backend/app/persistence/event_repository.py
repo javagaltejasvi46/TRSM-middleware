@@ -120,3 +120,4 @@ class EventRepository:
         )
 
 event_repository = EventRepository()
+

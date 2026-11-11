@@ -100,3 +100,4 @@ def test_list_events_with_filters():
     db_events = repo.list_events(actor_id="db_manager")
     assert len(db_events) == 1
     assert db_events[0].event_id == "evt-3"
+
