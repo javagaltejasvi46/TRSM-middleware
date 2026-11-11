@@ -315,7 +315,7 @@ export function defaultWorkflow(): WorkflowConfig {
     nodes: [
       mk('backend_agent', 'Backend Agent', 'backend', ['db_manager_agent'], ['customer_db'], 0, 0),
       mk('db_manager_agent', 'DB Manager Agent', 'db_manager', ['qa_agent'], ['customer_db', 'workflow_memory'], 640, 0),
-      mk('qa_agent', 'QA Agent', 'qa', [], ['test_suite'], 640, 320),
+      mk('qa_agent', 'QA Agent', 'qa', [], ['test_suite'], 640, 440),
     ],
     edges: [],
     metadata: {},
