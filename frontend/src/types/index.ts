@@ -53,6 +53,12 @@ export interface WorkflowConfig {
   metadata?: Record<string, any>;
 }
 
+export interface WorkflowValidationResult {
+  is_valid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
 export interface AuditEvent {
   event_id: string;
   run_id: string;

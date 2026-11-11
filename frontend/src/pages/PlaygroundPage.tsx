@@ -1,34 +1,81 @@
-import React, { useState } from 'react';
-import { AgentNode } from '../components/AgentNode/AgentNode';
-import { GatewayNode } from '../components/CommunicationGateway/GatewayNode';
+import React, { useCallback, useMemo, useState } from 'react';
+import { MousePointerClick } from 'lucide-react';
+import { WorkflowCanvas } from '../components/WorkflowCanvas/WorkflowCanvas';
+import { NodeConfigPanel } from '../components/NodeConfigPanel/NodeConfigPanel';
+import { WorkflowToolbar } from '../components/WorkflowToolbar/WorkflowToolbar';
 import { RunControls } from '../components/RunControls/RunControls';
 import { TraceExplorer } from '../components/TraceExplorer/TraceExplorer';
 import { MetricsPanel } from '../components/MetricsPanel/MetricsPanel';
 import { runsApi } from '../api/runs';
 import { eventsApi } from '../api/events';
 import { metricsApi } from '../api/metrics';
-import { AuditEvent, RunMetrics } from '../types';
+import { AgentNodeConfig, AgentRole, AuditEvent, RunMetrics, WorkflowConfig } from '../types';
+import {
+  addNode,
+  addPeer,
+  createAgentNode,
+  defaultWorkflow,
+  deleteNode,
+  moveNode,
+  removePeer,
+  setEntryNode,
+  toWorkflowConfig,
+  updateNode,
+  type XYPosition,
+} from '../lib/workflowGraph';
+import { runPreChecks } from '../lib/workflowChecks';
 
 export const PlaygroundPage: React.FC = () => {
+  const [workflow, setWorkflow] = useState<WorkflowConfig>(defaultWorkflow);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [metrics, setMetrics] = useState<RunMetrics | null>(null);
-  const [selectedAgent, setSelectedAgent] = useState<string | null>('backend_agent');
+
+  const preChecks = useMemo(() => runPreChecks(workflow), [workflow]);
+  const selectedNode = workflow.nodes.find((n) => n.node_id === selectedNodeId) ?? null;
+
+  // Gateway counts come only from audit events the backend returned for the last run.
+  const gatewayStats = useMemo(() => {
+    if (!activeRunId) return { mediated: null, blocked: null };
+    return {
+      mediated: events.filter((e) => e.event_type === 'message.policy_decided').length,
+      blocked: events.filter((e) => e.event_type === 'message.blocked' || e.event_type === 'message.quarantined').length,
+    };
+  }, [activeRunId, events]);
+
+  const handleAddNode = useCallback(
+    (role: AgentRole, position: XYPosition) => {
+      const node = createAgentNode(role, workflow.nodes.map((n) => n.node_id), position);
+      setWorkflow((wf) => addNode(wf, node));
+      setSelectedNodeId(node.node_id);
+    },
+    [workflow.nodes],
+  );
+
+  const handleDeleteNodes = useCallback((ids: string[]) => {
+    setWorkflow((wf) => ids.reduce(deleteNode, wf));
+    setSelectedNodeId((cur) => (cur && ids.includes(cur) ? null : cur));
+  }, []);
+
+  const handleApply = useCallback(
+    (next: AgentNodeConfig) => {
+      if (!selectedNodeId) return;
+      setWorkflow((wf) => updateNode(wf, selectedNodeId, next));
+      setSelectedNodeId(next.node_id);
+    },
+    [selectedNodeId],
+  );
 
   const handleStartRun = async (task: string, enableTrsm: boolean) => {
     setIsRunning(true);
     try {
-      const runResult = await runsApi.start({ task, enable_trsm: enableTrsm });
+      // Run the workflow drawn on the canvas, not the backend's built-in default.
+      const runResult = await runsApi.start({ task, enable_trsm: enableTrsm, workflow: toWorkflowConfig(workflow) });
       setActiveRunId(runResult.run_id);
-
-      // Fetch trace events
-      const runEvents = await eventsApi.getEvents(runResult.run_id);
-      setEvents(runEvents);
-
-      // Fetch metrics
-      const runMetrics = await metricsApi.getRunMetrics(runResult.run_id);
-      setMetrics(runMetrics);
+      setEvents(await eventsApi.getEvents(runResult.run_id));
+      setMetrics(await metricsApi.getRunMetrics(runResult.run_id));
     } catch (err) {
       console.error('Run execution error:', err);
     } finally {
@@ -37,98 +84,63 @@ export const PlaygroundPage: React.FC = () => {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', minHeight: '100vh', padding: '24px' }}>
-      {/* Top Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#f8fafc', letterSpacing: '-0.02em' }}>
-            TRSM Playground & Workflow Orchestrator
-          </h1>
-          <p style={{ fontSize: '13px', color: '#94a3b8' }}>
-            Trust, Risk, and Security Management middleware for agentic multi-agent systems
-          </p>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ fontSize: '12px', padding: '4px 10px', borderRadius: '6px', background: 'rgba(99, 102, 241, 0.1)', color: '#818cf8', border: '1px solid rgba(99, 102, 241, 0.3)' }}>
-            Protocol: Zero-Trust Inter-Agent Mediation
-          </span>
-        </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '24px' }}>
+      <div>
+        <h1 style={{ fontSize: '22px', fontWeight: 700, letterSpacing: '-0.02em' }}>TRSM Playground</h1>
+        <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+          Configure agents and their allowed routes. Every message and tool call is decided by the backend TRSM gateways at run time.
+        </p>
       </div>
 
-      {/* Main Layout Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '20px', flex: 1 }}>
-        {/* Left Column: Canvas and Metrics */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {/* Workflow Canvas */}
-          <div
-            className="glass-panel"
-            style={{
-              padding: '24px',
-              minHeight: '440px',
-              position: 'relative',
-              background: 'radial-gradient(circle at 50% 50%, rgba(30, 41, 59, 0.4) 0%, rgba(15, 23, 42, 0.8) 100%)',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 360px', gap: '20px', alignItems: 'start' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0 }}>
+          <WorkflowToolbar
+            workflow={workflow}
+            preChecks={preChecks}
+            onRename={(name) => setWorkflow((wf) => ({ ...wf, name }))}
+            onImport={(wf) => {
+              setWorkflow(wf);
+              setSelectedNodeId(null);
             }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '13px', fontWeight: 600, color: '#cbd5e1' }}>Visual Workflow Canvas (LangGraph Topology)</span>
-              <span style={{ fontSize: '11px', color: '#64748b' }}>Every node equipped with TRSM Node Guard</span>
-            </div>
+          />
 
-            {/* Simulated Nodes & Central Gateway Layout */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', margin: '40px 0' }}>
-              <AgentNode
-                id="backend_agent"
-                name="Backend Agent"
-                role="backend"
-                model="llama3:8b"
-                allowedPeers={['db_manager_agent']}
-                allowedTools={['customer_db']}
-                isSelected={selectedAgent === 'backend_agent'}
-                onSelect={() => setSelectedAgent('backend_agent')}
-              />
-
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                <GatewayNode />
-              </div>
-
-              <AgentNode
-                id="db_manager_agent"
-                name="DB Manager"
-                role="db_manager"
-                model="llama3:8b"
-                allowedPeers={['qa_agent']}
-                allowedTools={['customer_db', 'workflow_memory']}
-                isSelected={selectedAgent === 'db_manager_agent'}
-                onSelect={() => setSelectedAgent('db_manager_agent')}
-              />
-
-              <AgentNode
-                id="qa_agent"
-                name="QA Agent"
-                role="qa"
-                model="llama3:8b"
-                allowedPeers={[]}
-                allowedTools={['test_suite']}
-                isSelected={selectedAgent === 'qa_agent'}
-                onSelect={() => setSelectedAgent('qa_agent')}
-              />
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#64748b' }}>
-              <span>Arrows denote configured communication routes</span>
-              <span>Central gateway strictly authorizes message envelopes before delivery</span>
-            </div>
+          <div className="surface" style={{ height: '560px', overflow: 'hidden' }} aria-label="Workflow canvas">
+            <WorkflowCanvas
+              workflow={workflow}
+              selectedNodeId={selectedNodeId}
+              gatewayStats={gatewayStats}
+              onSelectNode={setSelectedNodeId}
+              onAddNode={handleAddNode}
+              onMoveNode={(id, pos) => setWorkflow((wf) => moveNode(wf, id, pos))}
+              onDeleteNodes={handleDeleteNodes}
+              onAddPeer={(s, t) => setWorkflow((wf) => addPeer(wf, s, t))}
+              onRemovePeer={(s, t) => setWorkflow((wf) => removePeer(wf, s, t))}
+            />
           </div>
+          <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '-12px' }}>
+            Drag from a node's right handle to another node to allow it as a peer. Select a route or node and press Delete to remove it. A route is a configured path, not proof a message will be allowed.
+          </p>
 
-          {/* Metrics Panel */}
           <MetricsPanel metrics={metrics} />
         </div>
 
-        {/* Right Column: Execution Controls & Audit Trace */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {selectedNode ? (
+            <NodeConfigPanel
+              key={`${selectedNode.node_id}:${JSON.stringify(selectedNode)}`}
+              node={selectedNode}
+              otherNodeIds={workflow.nodes.map((n) => n.node_id).filter((id) => id !== selectedNode.node_id)}
+              isEntry={workflow.entry_node_id === selectedNode.node_id}
+              onApply={handleApply}
+              onDelete={() => handleDeleteNodes([selectedNode.node_id])}
+              onSetEntry={() => setWorkflow((wf) => setEntryNode(wf, selectedNode.node_id))}
+            />
+          ) : (
+            <div className="surface" style={{ padding: '16px', display: 'flex', gap: '10px', alignItems: 'center', color: 'var(--text-secondary)', fontSize: '13px' }}>
+              <MousePointerClick size={18} aria-hidden="true" />
+              Select an agent on the canvas to configure it.
+            </div>
+          )}
           <RunControls isRunning={isRunning} onStartRun={handleStartRun} />
           <TraceExplorer events={events} />
         </div>
