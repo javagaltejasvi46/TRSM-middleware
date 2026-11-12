@@ -4,10 +4,13 @@ import { WorkflowConfig, WorkflowValidationResult } from '../../types';
 import { exportWorkflowJson, importWorkflowJson, toWorkflowConfig } from '../../lib/workflowGraph';
 import { PreCheckResult } from '../../lib/workflowChecks';
 import { workflowsApi } from '../../api/workflows';
+import { PRELOADED_WORKFLOWS } from '../../lib/preloadedWorkflows';
 
 interface WorkflowToolbarProps {
   workflow: WorkflowConfig;
   preChecks: PreCheckResult;
+  selectedWorkflowId?: string;
+  onSelectPreloadedWorkflow?: (id: string) => void;
   onRename: (name: string) => void;
   onImport: (wf: WorkflowConfig) => void;
 }
@@ -18,7 +21,14 @@ type BackendState =
   | { kind: 'result'; result: WorkflowValidationResult; checked: string }
   | { kind: 'error'; message: string };
 
-export const WorkflowToolbar: React.FC<WorkflowToolbarProps> = ({ workflow, preChecks, onRename, onImport }) => {
+export const WorkflowToolbar: React.FC<WorkflowToolbarProps> = ({
+  workflow,
+  preChecks,
+  selectedWorkflowId,
+  onSelectPreloadedWorkflow,
+  onRename,
+  onImport,
+}) => {
   const fileRef = useRef<HTMLInputElement>(null);
   const [backend, setBackend] = useState<BackendState>({ kind: 'idle' });
   const [importMsg, setImportMsg] = useState<{ ok: boolean; lines: string[] } | null>(null);
@@ -59,9 +69,27 @@ export const WorkflowToolbar: React.FC<WorkflowToolbarProps> = ({ workflow, preC
   return (
     <div className="surface" style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: '10px' }}>
-        <div className="field" style={{ flex: '1 1 240px' }}>
+        <div className="field" style={{ flex: '1 1 200px' }}>
           <label className="field-label" htmlFor="workflow-name">Workflow name</label>
           <input id="workflow-name" className="field-input" value={workflow.name} onChange={(e) => onRename(e.target.value)} />
+        </div>
+        <div className="field" style={{ flex: '1 1 220px' }}>
+          <label className="field-label" htmlFor="preloaded-workflow-select">Preloaded workflow template</label>
+          <select
+            id="preloaded-workflow-select"
+            className="field-input"
+            value={selectedWorkflowId ?? ''}
+            onChange={(e) => onSelectPreloadedWorkflow?.(e.target.value)}
+          >
+            {PRELOADED_WORKFLOWS.map((pw) => (
+              <option key={pw.id} value={pw.id}>
+                {pw.name}
+              </option>
+            ))}
+            {selectedWorkflowId && !PRELOADED_WORKFLOWS.some((pw) => pw.id === selectedWorkflowId) && (
+              <option value="custom">Custom / Modified Workflow</option>
+            )}
+          </select>
         </div>
         <button type="button" className="btn btn-secondary" onClick={exportFile}>
           <Download size={14} aria-hidden="true" /> Export JSON

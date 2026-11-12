@@ -47,6 +47,8 @@ export interface WorkflowCanvasProps {
   /** Gateway decision per sender->recipient route from the last run's audit events. */
   routeDecisions?: Record<string, RouteDecision>;
   gatewayStats: { mediated: number | null; blocked: number | null };
+  enableTrsm?: boolean;
+  onToggleTrsm?: () => void;
   onSelectNode: (nodeId: string | null) => void;
   onAddNode: (role: AgentRole, position: XYPosition) => void;
   onMoveNode: (nodeId: string, position: XYPosition) => void;
@@ -58,7 +60,7 @@ export interface WorkflowCanvasProps {
 const edgeId = (s: string, t: string) => `route:${s}->${t}`;
 
 function CanvasInner(props: WorkflowCanvasProps) {
-  const { workflow, selectedNodeId, nodeStatuses, routeDecisions, gatewayStats } = props;
+  const { workflow, selectedNodeId, nodeStatuses, routeDecisions, gatewayStats, enableTrsm, onToggleTrsm } = props;
   const { screenToFlowPosition } = useReactFlow();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [nodes, setNodes] = useState<FlowNode[]>([]);
@@ -73,16 +75,19 @@ function CanvasInner(props: WorkflowCanvasProps) {
       const gateway: GatewayFlowNode = {
         id: GATEWAY_NODE_ID,
         type: 'gateway',
-        position: gwPrev?.position ?? { x: 300, y: 200 },
+        position: gwPrev?.position ?? { x: 300, y: 180 },
         measured: gwPrev?.measured,
-        data: { ...gatewayStats },
+        data: {
+          ...gatewayStats,
+          enableTrsm,
+          onToggleTrsm,
+        },
         deletable: false,
         connectable: false,
         selectable: false,
-        // Not interactive, so keep it out of the keyboard tab order.
+        // Keep node focus out of tab order but interactive for clicks
         focusable: false,
-        // Behind the routes, so routes crossing the centre stay visible and clickable.
-        zIndex: -1,
+        zIndex: 0,
       };
       const routes = deriveEdges(workflow);
       const withOut = new Set(routes.map((r) => r.source_node_id));

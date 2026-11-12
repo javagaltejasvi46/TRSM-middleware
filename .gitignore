@@ -36,6 +36,7 @@ PHASES.md
 
 # Node / Frontend
 node_modules/
+.vite/
 frontend/dist/
 frontend/dist-ssr/
 *.local

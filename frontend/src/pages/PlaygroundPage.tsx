@@ -16,7 +16,6 @@ import {
   addNode,
   addPeer,
   createAgentNode,
-  defaultWorkflow,
   deleteNode,
   executionSignature,
   moveNode,
@@ -26,6 +25,7 @@ import {
   updateNode,
   type XYPosition,
 } from '../lib/workflowGraph';
+import { PRELOADED_WORKFLOWS } from '../lib/preloadedWorkflows';
 import { runPreChecks } from '../lib/workflowChecks';
 import { deriveNodeStates, deriveRouteDecisions, runTiming } from '../lib/runState';
 
@@ -47,7 +47,10 @@ const NO_EVENTS: AuditEvent[] = [];
 const errorText = (e: unknown) => (e instanceof ApiError ? e.message : (e as Error)?.message ?? String(e));
 
 export const PlaygroundPage: React.FC = () => {
-  const [workflow, setWorkflow] = useState<WorkflowConfig>(defaultWorkflow);
+  const [selectedWorkflowId, setSelectedWorkflowId] = useState<string>(PRELOADED_WORKFLOWS[0].id);
+  const [workflow, setWorkflow] = useState<WorkflowConfig>(PRELOADED_WORKFLOWS[0].workflow);
+  const [enableTrsm, setEnableTrsm] = useState<boolean>(true);
+  const [task, setTask] = useState<string>(PRELOADED_WORKFLOWS[0].defaultTask);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [pending, setPending] = useState<{ enableTrsm: boolean; sentAt: string } | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
@@ -95,9 +98,20 @@ export const PlaygroundPage: React.FC = () => {
           }
         : { kind: 'idle' };
 
+  const handleSelectPreloadedWorkflow = useCallback((id: string) => {
+    setSelectedWorkflowId(id);
+    const preloaded = PRELOADED_WORKFLOWS.find((p) => p.id === id);
+    if (preloaded) {
+      setWorkflow(preloaded.workflow);
+      setTask(preloaded.defaultTask);
+      setSelectedNodeId(null);
+    }
+  }, []);
+
   const handleAddNode = useCallback(
     (role: AgentRole, position: XYPosition) => {
       const node = createAgentNode(role, workflow.nodes.map((n) => n.node_id), position);
+      setSelectedWorkflowId('custom');
       setWorkflow((wf) => addNode(wf, node));
       setSelectedNodeId(node.node_id);
     },
@@ -105,6 +119,7 @@ export const PlaygroundPage: React.FC = () => {
   );
 
   const handleDeleteNodes = useCallback((ids: string[]) => {
+    setSelectedWorkflowId('custom');
     setWorkflow((wf) => ids.reduce(deleteNode, wf));
     setSelectedNodeId((cur) => (cur && ids.includes(cur) ? null : cur));
   }, []);
@@ -112,6 +127,7 @@ export const PlaygroundPage: React.FC = () => {
   const handleApply = useCallback(
     (next: AgentNodeConfig) => {
       if (!selectedNodeId) return;
+      setSelectedWorkflowId('custom');
       setWorkflow((wf) => updateNode(wf, selectedNodeId, next));
       setSelectedNodeId(next.node_id);
     },
@@ -160,9 +176,15 @@ export const PlaygroundPage: React.FC = () => {
           <WorkflowToolbar
             workflow={workflow}
             preChecks={preChecks}
-            onRename={(name) => setWorkflow((wf) => ({ ...wf, name }))}
+            selectedWorkflowId={selectedWorkflowId}
+            onSelectPreloadedWorkflow={handleSelectPreloadedWorkflow}
+            onRename={(name) => {
+              setSelectedWorkflowId('custom');
+              setWorkflow((wf) => ({ ...wf, name }));
+            }}
             onImport={(wf) => {
               setWorkflow(wf);
+              setSelectedWorkflowId('custom');
               setSelectedNodeId(null);
             }}
           />
@@ -172,6 +194,8 @@ export const PlaygroundPage: React.FC = () => {
               workflow={workflow}
               selectedNodeId={selectedNodeId}
               gatewayStats={gatewayStats}
+              enableTrsm={enableTrsm}
+              onToggleTrsm={() => setEnableTrsm((prev) => !prev)}
               nodeStatuses={nodeStatuses}
               routeDecisions={stale ? undefined : routeDecisions}
               onSelectNode={setSelectedNodeId}
@@ -208,7 +232,12 @@ export const PlaygroundPage: React.FC = () => {
           )}
           <RunControls
             isRunning={pending !== null}
-            onStartRun={handleStartRun}
+            enableTrsm={enableTrsm}
+            task={task}
+            onTaskChange={setTask}
+            selectedWorkflowId={selectedWorkflowId}
+            onSelectWorkflowId={handleSelectPreloadedWorkflow}
+            onStartRun={(t, trsm) => handleStartRun(t, trsm)}
             blockedReason={preChecks.errors.length ? `Fix ${preChecks.errors.length} pre-check error${preChecks.errors.length > 1 ? 's' : ''} above before running.` : null}
           />
           <RunStatusPanel state={panelState} onViewAgentEvents={(id) => setFocusAgent({ id, nonce: Date.now() })} />
