@@ -25,7 +25,7 @@ function makeNode(
       node_id,
       name,
       role,
-      model: 'mock',
+      model: 'llama3.2:1b',
       instructions,
       allowed_peers: peers,
       allowed_tools: tools,
@@ -148,3 +148,4 @@ export const PRELOADED_WORKFLOWS: PreloadedWorkflow[] = [
     ),
   },
 ];
+

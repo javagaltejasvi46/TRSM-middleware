@@ -28,3 +28,4 @@ describe('preloadedWorkflows', () => {
     expect(categories.has('resource_authorization')).toBe(true);
   });
 });
+

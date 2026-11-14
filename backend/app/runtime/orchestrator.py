@@ -13,6 +13,7 @@ from .communication_gateway import AgentCommunicationGateway
 from .node_guard import NodeGuard
 from .resource_gateway import ControlledResourceGateway
 from .adapters.mock_adapter import MockAgentAdapter
+from .adapters.ollama_adapter import OllamaAdapter
 
 
 class Orchestrator:
@@ -23,11 +24,13 @@ class Orchestrator:
         comm_gateway: Optional[AgentCommunicationGateway] = None,
         resource_gateway: Optional[ControlledResourceGateway] = None,
         event_collector: Optional[AuditEventCollector] = None,
+        ollama_adapter: Optional[OllamaAdapter] = None,
     ):
         self.comm_gateway = comm_gateway or AgentCommunicationGateway()
         self.resource_gateway = resource_gateway or ControlledResourceGateway()
         self.event_collector = event_collector or AuditEventCollector()
         self.mock_adapter = MockAgentAdapter()
+        self.ollama_adapter = ollama_adapter or OllamaAdapter()
 
     async def run_workflow(
         self,
@@ -136,13 +139,13 @@ class Orchestrator:
                 if decision.outcome != PolicyDecisionEnum.ALLOW:
                     blocked_actions += 1
 
-            # Check outgoing edge
+            # Check outgoing edge or allowed peers
             edge = next((e for e in workflow.edges if e.source_node_id == current_node_id), None)
-            if not edge:
+            target_node_id = edge.target_node_id if edge else (entry_node.allowed_peers[0] if entry_node.allowed_peers else None)
+            if not target_node_id:
                 # Reached leaf node
                 break
 
-            target_node_id = edge.target_node_id
             proposal = guard.create_message_proposal(
                 recipient_id=target_node_id,
                 content=current_payload,
@@ -166,9 +169,30 @@ class Orchestrator:
             if not entry_node:
                 break
             guard = NodeGuard(entry_node.node_id, entry_node.role.value)
-            current_payload = self.mock_adapter.generate_response(
-                entry_node.role.value, envelope.content
-            )
+            
+            # Query local Ollama model if configured and daemon is running, else use deterministic mock
+            current_payload = None
+            if entry_node.model and entry_node.model != "mock":
+                if await self.ollama_adapter.is_available():
+                    system_prompt = (
+                        f"You are an AI agent named '{entry_node.name}' operating with role '{entry_node.role.value}'. "
+                        f"Assigned tools: {', '.join(entry_node.allowed_tools) or 'None'}. "
+                        f"Authorized peers: {', '.join(entry_node.allowed_peers) or 'None'}. "
+                        f"{entry_node.instructions}"
+                    )
+                    try:
+                        current_payload = await self.ollama_adapter.generate(
+                            model=entry_node.model,
+                            prompt=envelope.content,
+                            system=system_prompt,
+                        )
+                    except Exception:
+                        current_payload = None
+
+            if not current_payload:
+                current_payload = self.mock_adapter.generate_response(
+                    entry_node.role.value, envelope.content
+                )
 
         # Workflow completed
         await self.event_collector.emit(
